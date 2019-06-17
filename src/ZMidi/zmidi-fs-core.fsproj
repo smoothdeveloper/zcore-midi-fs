@@ -1,0 +1,11 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net45</TargetFrameworks>
+     <OutputPath>..\..\build\$(Configuration)\$(Platform)</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Read.fs" />
+    <Content Include="paket.references" />
+  </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
+</Project>
