@@ -407,32 +407,35 @@ module Internal =
     type ParserState = {
       pos: Pos
       running_status: VoiceEvent
-      input: Span<byte>
+      input: byte array
     }
     with
       member state.posPastEnd = state.pos >= state.input.Length
       member state.moved direction = { state with pos = state.pos + direction }
       member state.get () = state.input.[state.pos]
 
-    type ErrorMessage = string
+    type ErrorMessage = 
+      | EOF of where: string
     type ParseError = ParseError of Pos * ErrorMessage
 
-    type ParserM<'a> = {getParserM : ParserState -> (Result<'a,ParseError> * ParserState)}
+    type ParserMonad<'a> =
+        | ParserMonad of (byte [] -> ParserState -> Result<'a, ParseError> * ParserState )
 
-    let parserM parse = { getParserM = parse }
-    
+
+    //type ParserM<'a> = {getParserM : ParserState -> (Result<'a,ParseError> * ParserState)}
     let err pos msg = Error (ParseError(pos, msg))
     
-    let getPos = parserM (fun state -> (Ok (state.pos), state))
+    let parserM parse = ParserMonad parse
+    let getPos = parserM (fun _ state -> Ok (state.pos), state)
 
-    let inline failPastEndOrResult (state: ParserState) funcName getResultAndState =
+    let inline failPastEndOrResult data (state: ParserState) funcName getResultAndState =
       if state.posPastEnd then
-        (err state.pos  (funcName + " - no more data")), state
+        (err state.pos  (EOF funcName)), state
       else
         let res, state = getResultAndState state
-        Ok res, state
+        Ok (res), state
 
-    let inline checkedPastEndOrResult fName getResultAndNextState = parserM <| fun state -> failPastEndOrResult state fName getResultAndNextState
+    let inline checkedPastEndOrResult fName getResultAndNextState = parserM <| fun bytes state -> failPastEndOrResult bytes state fName getResultAndNextState
     
     let peek = checkedPastEndOrResult "peek" (fun state -> state.get(), state)
 
@@ -453,7 +456,7 @@ module Internal =
         fun state -> state.get(), state.moved(1)
       )
 
-    let word16be : ParserM<word16> =
+    let word16be : ParserMonad<word16> =
       checkedPastEndOrResult "word16be" (
         fun state -> failwith "uncons2!!!"
       )
