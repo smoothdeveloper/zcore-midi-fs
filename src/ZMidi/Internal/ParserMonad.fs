@@ -190,3 +190,11 @@ module ParserMonad =
             return uint16be a b
             }
         <??> sprintf "uint16be: failed at %i"
+
+    let readWord14be = 
+        parseMidi {
+            let! a = readByte
+            let! b = readByte
+            return (word14be a b)
+            }
+        <??> sprintf "word14be: failed at %i"
