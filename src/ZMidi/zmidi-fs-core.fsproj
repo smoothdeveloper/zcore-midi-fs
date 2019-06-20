@@ -4,6 +4,8 @@
      <OutputPath>..\..\build\$(Configuration)\$(Platform)</OutputPath>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Internal\Utils.fs" />
+    <Compile Include="Internal\ParserMonad.fs" />
     <Compile Include="Read.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
