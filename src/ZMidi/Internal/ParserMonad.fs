@@ -135,7 +135,9 @@ module ParserMonad =
                   Ok (Some a1, st) 
                 else Ok (None, st)
 
-    let count (length : int) (parser : ParserMonad<'a>) : ParserMonad<'a []> = 
+    /// Repeats a given <see paramref="parser"/> <see paramref="length"/> times.
+    /// Fails with accumulated errors when any encountered.
+    let count (length : int) (parser : ParserMonad<'a>) : ParserMonad<'a []> =
         ParserMonad <| fun input state -> 
             let rec work (i : int) 
                          (st : State) 
@@ -151,7 +153,6 @@ module ParserMonad =
                         sk st2 (a1 :: ac))
             work length state (fun msg -> Error msg) (fun st ac -> Ok (ac, st)) 
                 |> Result.map (fun (ans, st) -> (List.toArray ans, st))
-
 
     /// Drop a byte (word8)
     let dropByte : ParserMonad<unit> = 
