@@ -18,11 +18,14 @@ module ParserMonad =
         | ChannelAftertouch of byte
         | PitchBend         of byte
 
+  
+    type MidiData = byte array
 
     type Pos = int
 
-    type ErrMsg = string
-
+    type ErrMsg = 
+      | EOF of where: string
+      | Other of error: string
     type State = 
         { Position: Pos 
           RunningStatus: VoiceEvent
@@ -30,7 +33,7 @@ module ParserMonad =
     
 
     type ParserMonad<'a> = 
-        private ParserMonad of (byte [] -> State -> Result<'a * State, ErrMsg> )
+        private ParserMonad of (MidiData -> State -> Result<'a * State, ErrMsg> )
 
     let inline private apply1 (parser : ParserMonad<'a>) 
                        (midiData : byte[])
@@ -48,7 +51,7 @@ module ParserMonad =
             | Ok (ans, st1) -> apply1 (next ans) input st1
 
     let mzero () : ParserMonad<'a> = 
-        ParserMonad <| fun _ _ -> Error "mzero"
+        ParserMonad <| fun _ _ -> Error  (EOF "mzero")
 
     let inline mplus (parser1 : ParserMonad<'a>) (parser2 : ParserMonad<'a>) : ParserMonad<'a> = 
         ParserMonad <| fun input state -> 
@@ -81,14 +84,14 @@ module ParserMonad =
 
     /// Throw a parse error
     let parseError (genMessage : Pos -> string) : ParserMonad<'a> = 
-        ParserMonad <| fun _ st -> Error (genMessage st.Position)
+        ParserMonad <| fun _ st -> Error (Other (genMessage st.Position))
 
     /// Run the parser, if it fails swap the error message.
     let ( <??> ) (parser : ParserMonad<'a>) (genMessage : Pos -> string) : ParserMonad<'a> = 
         ParserMonad <| fun input st -> 
             match apply1 parser input st with
             | Ok result -> Ok result
-            | Error _ -> Error (genMessage st.Position)
+            | Error _ -> Error (Other (genMessage st.Position))
 
 
     let getRunningEvent : ParserMonad<VoiceEvent> = 
@@ -100,26 +103,37 @@ module ParserMonad =
     let getPos : ParserMonad<int> =
         ParserMonad <| fun _ st -> Ok (st.Position, st)
 
-    let peek : ParserMonad<byte> = 
-        ParserMonad <| fun input st -> 
-            try 
-                let a1 = input.[st.Position]
-                Ok (a1, st)
-            with
-            | _ -> Error "peek - position error"
-    
-    /// Conditionally get a byte (word8) . Fails if input is finished.
+    let inline private (|PositionValid|PositionInvalid|) (input: MidiData, state: State) =
+      if state.Position >= 0 && state.Position < input.Length then
+        PositionValid
+      else
+        PositionInvalid
+
+    let inline private checkedParseM (name: string) (f: MidiData -> State -> Result<('a * State), ErrMsg>) =
+      ParserMonad 
+          (fun input state -> 
+              try 
+                match input,state with
+                | PositionValid -> f input state
+                | PositionInvalid -> Error (EOF name)
+              with
+              | e -> Error (Other (sprintf "%A" e))
+          )
+
+    let peek : ParserMonad<byte> =
+        checkedParseM "peek" <|
+            fun input st -> Ok (input.[st.Position], st)
+
+    /// Conditionally gets a byte (word8). Fails if input is finished.
     /// Consumes data on if predicate succeeds, does not consume if
     /// predicate fails.
     let cond (test : byte -> bool) : ParserMonad<byte option> = 
-        ParserMonad <| fun input st -> 
-            try 
+        checkedParseM "cond" <|
+            fun input st ->
                 let a1 = input.[st.Position]
                 if test a1 then 
-                    Ok (Some a1, st) 
+                  Ok (Some a1, st) 
                 else Ok (None, st)
-            with
-            | _ -> Error "cond - position error"
 
     let count (length : int) (parser : ParserMonad<'a>) : ParserMonad<'a []> = 
         ParserMonad <| fun input state -> 
@@ -141,22 +155,16 @@ module ParserMonad =
 
     /// Drop a byte (word8)
     let dropByte : ParserMonad<unit> = 
-        ParserMonad <| fun input st -> 
-            if st.Position < input.Length then
-                Ok ((), { st with Position = st.Position + 1 })
-            else 
-                Error "dropByte - no more data"
+        checkedParseM "dropByte" <| 
+            fun input st -> Ok ((), { st with Position = st.Position + 1 })
 
     /// Parse a byte (Word8).
     let readByte : ParserMonad<byte>= 
-        ParserMonad <| fun input st -> 
-            try 
+        checkedParseM "dropByte" <| 
+            fun input st ->
                 let a1 = input.[st.Position]
                 Ok (a1, { st with Position = st.Position + 1 })
-                
-            with
-            | _ -> Error (sprintf "readByte - no more data at %i" st.Position)
-
+              
     /// Parse a single byte char.
     let readChar : ParserMonad<char> = 
         parseMidi { 
