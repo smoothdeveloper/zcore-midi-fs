@@ -158,6 +158,14 @@ module ParserMonad =
             work length state (fun msg -> Error msg) (fun st ac -> Ok (ac, st)) 
                 |> Result.map (fun (ans, st) -> (List.toArray ans, st))
 
+    let boundRepeat n p =
+        parseMidi {
+          return [|
+          for i in 0 .. (n - 1) do
+            yield! p
+          |]
+        }
+
     /// Drop a byte (word8).
     let dropByte : ParserMonad<unit> = 
         checkedParseM "dropByte" <| 

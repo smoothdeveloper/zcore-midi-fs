@@ -57,6 +57,52 @@ module ReadFile =
                      timeDivision = timeDivision
                      format = format }
             }
+    let trackHeader =
+        parseMidi {
+          let! _ = assertString "MTrk"
+          return! readUInt32be
+        }
+    let event : ParserMonad<MidiMessage> = 
+      parseMidi {
+        return! fatalError (Other "not implemented") }
+    let getVarLen : ParserMonad<uint32> = 
+      parseMidi {
+        return! fatalError (Other "not implemented")
+        //getVarlen :: ParserM Word32
+        //getVarlen = liftM fromVarlen step1
+        //  where
+        //    step1     = word8 >>= \a -> if msbHigh a then step2 a else return (V1 a)
+        //    step2 a   = word8 >>= \b -> if msbHigh b then step3 a b else return (V2 a b)
+        //    step3 a b = word8 >>= \c -> if msbHigh c then do { d <- word8
+        //                                                     ; return (V4 a b c d) }
+        //                                             else return (V3 a b c)  
+        
+        
+      }
+
+
+    let deltaTime = 
+      parseMidi {
+          return! getVarLen
+      } <??> (fun p -> "delta time")
+
+    let message = 
+        parseMidi {
+          let! deltaTime = deltaTime
+          let! event = event
+          return deltaTime, event
+        }
+    let messages i = 
+      parseMidi {
+          return! fatalError (Other "not implemented")
+          //let! messages = boundRepeat i message
+      }
+    let track : ParserMonad<MidiTrack> =
+        parseMidi {
+            let header = trackHeader
+            return! fatalError (Other "not implemented")
+           // let! messages = messages
+        }
     //let midiFile =
     //  parseMidi {
     //    let! header = P.header
