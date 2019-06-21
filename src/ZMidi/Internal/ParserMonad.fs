@@ -26,18 +26,20 @@ module ParserMonad =
     type ErrMsg = 
       | EOF of where: string
       | Other of error: string
+
     type State = 
         { Position: Pos 
           RunningStatus: VoiceEvent
         }
     
+    type ParseError = ParseError of position: Pos * message: ErrMsg
 
     type ParserMonad<'a> = 
-        private ParserMonad of (MidiData -> State -> Result<'a * State, ErrMsg> )
+        ParserMonad of (MidiData -> State -> Result<'a * State, ParseError> )
 
     let inline private apply1 (parser : ParserMonad<'a>) 
                        (midiData : byte[])
-                       (state : State)  :  Result<'a * State, ErrMsg> = 
+                       (state : State)  :  Result<'a * State, ParseError> = 
         let (ParserMonad fn) = parser in fn midiData state
 
     let inline mreturn (x:'a) : ParserMonad<'a> = 
@@ -51,7 +53,7 @@ module ParserMonad =
             | Ok (ans, st1) -> apply1 (next ans) input st1
 
     let mzero () : ParserMonad<'a> = 
-        ParserMonad <| fun _ _ -> Error  (EOF "mzero")
+        ParserMonad <| fun _ state -> Error (ParseError(state.Position, EOF "mzero"))
 
     let inline mplus (parser1 : ParserMonad<'a>) (parser2 : ParserMonad<'a>) : ParserMonad<'a> = 
         ParserMonad <| fun input state -> 
@@ -73,7 +75,7 @@ module ParserMonad =
     let (parseMidi:ParserBuilder) = new ParserBuilder()
 
     /// Run the parser on a file.
-    let runParseMidi (ma : ParserMonad<'a>) (inputPath : string) : Result<'a, ErrMsg> = 
+    let runParseMidi (ma : ParserMonad<'a>) (inputPath : string) : Result<'a, ParseError> = 
         use stream  = File.Open(path = inputPath, mode = FileMode.Open, access = FileAccess.Read)
         use memory = new MemoryStream()
         stream.CopyTo(memory)
@@ -84,15 +86,17 @@ module ParserMonad =
 
     /// Throw a parse error
     let parseError (genMessage : Pos -> string) : ParserMonad<'a> = 
-        ParserMonad <| fun _ st -> Error (Other (genMessage st.Position))
+        ParserMonad <| fun _ st -> Error (ParseError(st.Position, Other (genMessage st.Position)))
 
     /// Run the parser, if it fails swap the error message.
     let ( <??> ) (parser : ParserMonad<'a>) (genMessage : Pos -> string) : ParserMonad<'a> = 
         ParserMonad <| fun input st -> 
             match apply1 parser input st with
             | Ok result -> Ok result
-            | Error _ -> Error (Other (genMessage st.Position))
+            | Error _ -> Error (ParseError(st.Position, Other (genMessage st.Position)))
 
+    let fatalError err =
+      ParserMonad <| fun _ st -> Error (ParseError(st.Position, err))
 
     let getRunningEvent : ParserMonad<VoiceEvent> = 
         ParserMonad <| fun _ st -> Ok (st.RunningStatus , st)
@@ -109,16 +113,16 @@ module ParserMonad =
       else
         PositionInvalid
 
-    let inline private checkedParseM (name: string) (f: MidiData -> State -> Result<('a * State), ErrMsg>) =
-      ParserMonad 
-          (fun input state -> 
-              try 
-                match input,state with
-                | PositionValid -> f input state
-                | PositionInvalid -> Error (EOF name)
-              with
-              | e -> Error (Other (sprintf "%A" e))
-          )
+    let inline private checkedParseM (name: string) (f: MidiData -> State -> Result<('a * State), ParseError>) =
+        ParserMonad 
+            (fun input state -> 
+                try 
+                  match input,state with
+                  | PositionValid -> f input state
+                  | PositionInvalid -> Error (ParseError(state.Position, EOF name))
+                with
+                | e -> Error (ParseError(state.Position, (Other (sprintf "%A" e))))
+            )
 
     let peek : ParserMonad<byte> =
         checkedParseM "peek" <|
@@ -141,8 +145,8 @@ module ParserMonad =
         ParserMonad <| fun input state -> 
             let rec work (i : int) 
                          (st : State) 
-                         (fk : ErrMsg -> Result<'a list * State, ErrMsg>) 
-                         (sk : State -> 'a list  -> Result<'a list * State, ErrMsg>) = 
+                         (fk : ParseError -> Result<'a list * State, ParseError>) 
+                         (sk : State -> 'a list  -> Result<'a list * State, ParseError>) = 
                 if i <= 0 then 
                     sk st []
                 else 
@@ -154,7 +158,7 @@ module ParserMonad =
             work length state (fun msg -> Error msg) (fun st ac -> Ok (ac, st)) 
                 |> Result.map (fun (ans, st) -> (List.toArray ans, st))
 
-    /// Drop a byte (word8)
+    /// Drop a byte (word8).
     let dropByte : ParserMonad<unit> = 
         checkedParseM "dropByte" <| 
             fun input st -> Ok ((), { st with Position = st.Position + 1 })
@@ -181,16 +185,16 @@ module ParserMonad =
         }
         <??> sprintf "readString failed at %i"
 
-
     // Parse a uint16 (big endian).
-    let readUint16be : ParserMonad<uint16>= 
+    let readUInt16be : ParserMonad<uint16>= 
         parseMidi { 
             let! a = readByte
             let! b = readByte
-            return uint16be a b
+            return word16be a b
             }
         <??> sprintf "uint16be: failed at %i"
 
+    // Parse a word14 (big endian) from 2 consecutive bytes.
     let readWord14be = 
         parseMidi {
             let! a = readByte
@@ -198,3 +202,13 @@ module ParserMonad =
             return (word14be a b)
             }
         <??> sprintf "word14be: failed at %i"
+
+    // Parse a word32 (big endian).
+    let readUInt32be =
+      parseMidi {
+        let! a = readByte
+        let! b = readByte
+        let! c = readByte
+        let! d = readByte
+        return (word32be a b c d)
+        }

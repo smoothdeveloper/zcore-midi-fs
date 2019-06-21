@@ -23,7 +23,7 @@ type MidiFormat =
 /// Format 2 file - 1 or more independent tracks.
 | MidiFormat2
 type MidiTimeDivision =
-    | FPS of frame: word16
+    | FramePerSecond of frame: word16
     | TicksPerBeat of ticks: word16
 
 type MidiHeader = {
