@@ -64,13 +64,31 @@ module ParserMonad =
     let inline private delayM (fn:unit -> ParserMonad<'a>) : ParserMonad<'a> = 
         bindM (mreturn ()) fn 
 
+    let inline mfor (items: #seq<'a>) (fn: unit -> ParserMonad<'a>) : ParserMonad<#seq<'a>> = failwithf ""
+
 
     type ParserBuilder() = 
-        member self.Return x    = mreturn x
-        member self.Bind (p,f)  = bindM p f
-        member self.Zero ()     = mzero ()
-        member self.Combine (ma, mb) = mplus ma mb
         member self.ReturnFrom (ma:ParserMonad<'a>) : ParserMonad<'a> = ma
+        member self.Return x         = mreturn x
+        member self.Bind (p,f)       = bindM p f
+        member self.Zero ()          = mzero ()
+        member self.Combine (ma, mb) = mplus ma mb
+
+
+        // inspired from http://www.fssnip.net/7UJ/title/ResultBuilder-Computational-Expression
+        // probably broken
+        member self.TryFinally(m, compensation) =
+             try self.ReturnFrom(m)
+             finally compensation()
+        member self.Delay(f: unit -> _) = f ()
+        member self.Using(res:#System.IDisposable, body) =
+              self.TryFinally(body res, fun () -> match res with null -> () | disp -> disp.Dispose())
+        member self.While(guard, f) =
+               if not (guard()) then self.Zero() else
+               do f() |> ignore
+               self.While(guard, f)
+        member self.For(sequence:seq<_>, body) =
+               self.Using(sequence.GetEnumerator(), fun enum -> self.While(enum.MoveNext, self.Delay(fun () -> body enum.Current)))
 
     let (parseMidi:ParserBuilder) = new ParserBuilder()
 
@@ -158,11 +176,14 @@ module ParserMonad =
             work length state (fun msg -> Error msg) (fun st ac -> Ok (ac, st)) 
                 |> Result.map (fun (ans, st) -> (List.toArray ans, st))
 
-    let boundRepeat n p =
+    let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
         parseMidi {
           return [|
-          for i in 0 .. (n - 1) do
-            yield! p
+          for i in LanguagePrimitives.GenericZero .. (n - LanguagePrimitives.GenericOne) do
+            //let! r = p
+            //yield r
+            failwith "boundRepeat: not implemented"
+            ()
           |]
         }
 

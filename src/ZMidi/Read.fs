@@ -96,14 +96,14 @@ module ReadFile =
         }
     let messages i = 
       parseMidi {
-          return! fatalError (Other "not implemented")
-          //let! messages = boundRepeat i message
+          return! boundRepeat i message
       }
     let track : ParserMonad<MidiTrack> =
         parseMidi {
-            let header = trackHeader
+            let! length = trackHeader
+            let! messages = messages length
             return! fatalError (Other "not implemented")
-           // let! messages = messages
+           
         }
     //let midiFile =
     //  parseMidi {
