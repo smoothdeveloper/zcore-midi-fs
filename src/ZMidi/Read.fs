@@ -20,12 +20,14 @@ module ReadFile =
           return! fatalError errorMessage
       }
 
-    let inline (|TestBit|_|) (bit: int) (i: uint16) =
-      let mask = uint16(1 <<< bit)
+    let inline (|TestBit|_|) (bit: int) (i: ^T) =
+      let mask = LanguagePrimitives.GenericOne <<< bit
       if mask &&& i = mask then Some () else None
-    let inline clearBit (bit: int) (i:uint16) =
-      let mask = ~~~ (uint16(1 <<< bit))
+
+    let inline clearBit (bit: int) (i: ^T) =
+      let mask = ~~~ (LanguagePrimitives.GenericOne <<< bit)
       i &&& mask
+
     let assertString (s: string) =
       postCheck (readString s.Length) ((=) s) (Other (sprintf "assertString: expected '%s'" s))
 
