@@ -106,6 +106,16 @@ module ParserMonad =
     let parseError (genMessage : Pos -> string) : ParserMonad<'a> = 
         ParserMonad <| fun _ st -> Error (ParseError(st.Position, Other (genMessage st.Position)))
 
+    let fmapM (modify: 'a -> 'b) (parser : ParserMonad<'a>) : ParserMonad<'b> = 
+        ParserMonad <| fun input state -> 
+            match apply1 parser input state with
+            | Error err -> Error err
+            | Ok (a, st2) -> Ok (modify a, st2)
+
+    /// Operator for fmapM
+    let ( <<| ) (modify: 'a -> 'b) (parser : ParserMonad<'a>) : ParserMonad<'b> = 
+       fmapM modify parser
+
     /// Run the parser, if it fails swap the error message.
     let ( <??> ) (parser : ParserMonad<'a>) (genMessage : Pos -> string) : ParserMonad<'a> = 
         ParserMonad <| fun input st -> 
@@ -114,7 +124,7 @@ module ParserMonad =
             | Error _ -> Error (ParseError(st.Position, Other (genMessage st.Position)))
 
     let fatalError err =
-      ParserMonad <| fun _ st -> Error (ParseError(st.Position, err))
+        ParserMonad <| fun _ st -> Error (ParseError(st.Position, err))
 
     let getRunningEvent : ParserMonad<VoiceEvent> = 
         ParserMonad <| fun _ st -> Ok (st.RunningStatus , st)
@@ -179,17 +189,31 @@ module ParserMonad =
     /// Apply the parser for /count/ times, derive the final answer
     /// from the intermediate list with the supplied function.
     let inline gencount (plen: ParserMonad<'T>) (p: ParserMonad<'a>) (constr: ^T -> 'a array -> 'answer) : ParserMonad<'answer> =
-        failwith "gencount: not implemented"
+        parseMidi { 
+            let! times = plen 
+            let! arr = count (int times) p
+            return (constr times arr)       
+        }
 
     /// Run a parser within a bounded section of the input stream.
-    let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
-        parseMidi {
-            let l = Array.zeroCreate (int n) // can't use array expression inside a CE (at least as is)
-            for i in LanguagePrimitives.GenericZero .. (n - LanguagePrimitives.GenericOne) do
-              let! r = p
-              l.[i] <- r
-            return l
-        }
+    let inline boundRepeat (n: int) (parser: ParserMonad<'a>) : ParserMonad<'a []> =
+        ParserMonad <| fun input state -> 
+            let limit = state.Position + n
+            let rec work (st : State) 
+                         (fk : ParseError -> Result<'a list * State, ParseError>) 
+                         (sk : State -> 'a list  -> Result<'a list * State, ParseError>) = 
+                match apply1 parser input st with
+                | Error a -> fk a
+                | Ok(a1, st1) -> 
+                    match compare st1.Position limit with
+                    | 0 -> sk st1 [a1]
+                    | t when t > 0 -> fk (ParseError(st1.Position, Other "boundRepeat - too far"))
+                    | _ -> 
+                        work st1 fk (fun st2 ac ->
+                            sk st2 (a1 :: ac))
+            work state (fun msg -> Error msg) (fun st ac -> Ok (ac, st)) 
+                |> Result.map (fun (ans, st) -> (List.toArray ans, st))
+
 
     /// Drop a byte (word8).
     let dropByte : ParserMonad<unit> = 
