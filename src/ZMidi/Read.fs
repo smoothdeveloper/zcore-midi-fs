@@ -34,6 +34,16 @@ module ReadFile =
     let assertWord32 i =
       postCheck readUInt32be ((=) i) (Other (sprintf "assertWord32: expected '%i'" i))
 
+    let assertWord8 i =
+      postCheck readByte ((=) i) (Other (sprintf "assertWord8: expected '%i'" i))
+
+    let getVarlen : ParserMonad<word32> =
+      parseMidi {
+        failwith "getVarlen: not imple"
+      }
+    
+    let getVarlenText = gencount getVarlen readChar (fun _ b -> System.String b)
+
     let fileFormat =
         parseMidi {
             match! readUInt16be with
@@ -64,46 +74,54 @@ module ReadFile =
           let! _ = assertString "MTrk"
           return! readUInt32be
         }
-    let event : ParserMonad<MidiMessage> = 
+    let textEvent textType =
       parseMidi {
-        return! fatalError (Other "not implemented") }
-    let getVarLen : ParserMonad<uint32> = 
-      parseMidi {
-        return! fatalError (Other "not implemented")
-        //getVarlen :: ParserM Word32
-        //getVarlen = liftM fromVarlen step1
-        //  where
-        //    step1     = word8 >>= \a -> if msbHigh a then step2 a else return (V1 a)
-        //    step2 a   = word8 >>= \b -> if msbHigh b then step3 a b else return (V2 a b)
-        //    step3 a b = word8 >>= \c -> if msbHigh c then do { d <- word8
-        //                                                     ; return (V4 a b c d) }
-        //                                             else return (V3 a b c)  
-        
-        
+        let! text = getVarlenText
+        return TextEvent(textType, text)
       }
+    let metaEventSequenceNumber =
+      parseMidi {
+        let! a = assertWord8 2uy
+        let! b = peek
+        return SequenceNumber(word16be a b)
+      }
+      
+    let metaEventGenericText =
+      parseMidi {
+        let! a = assertWord8 2uy
+        let! b = peek
+        return! textEvent GenericText
+      }
+    let metaEvent i =
+      parseMidi {
+        match i with
+        | 0x00 -> return metaEventSequenceNumber
+        | 0x01 -> return metaEventGenericText
+      }
+    let event : ParserMonad<MidiEvent> = 
+      parseMidi {
+        return! fatalError (Other "event: not implemented") }
 
 
     let deltaTime = 
       parseMidi {
-          return! getVarLen
+          return! getVarlen
       } <??> (fun p -> "delta time")
 
     let message = 
         parseMidi {
           let! deltaTime = deltaTime
           let! event = event
-          return deltaTime, event
+          return { timestamp = DeltaTime(deltaTime); event = event }
         }
     let messages i = 
       parseMidi {
-          return! boundRepeat i message
+          return! boundRepeat (int i) message
       }
     let track : ParserMonad<MidiTrack> =
         parseMidi {
             let! length = trackHeader
-            let! messages = messages length
-            return! fatalError (Other "not implemented")
-           
+            return! messages length
         }
     //let midiFile =
     //  parseMidi {

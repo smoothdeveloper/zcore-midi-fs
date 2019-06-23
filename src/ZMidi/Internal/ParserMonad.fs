@@ -176,6 +176,12 @@ module ParserMonad =
             work length state (fun msg -> Error msg) (fun st ac -> Ok (ac, st)) 
                 |> Result.map (fun (ans, st) -> (List.toArray ans, st))
 
+    /// Apply the parser for /count/ times, derive the final answer
+    /// from the intermediate list with the supplied function.
+    let inline gencount (plen: ParserMonad<'T>) (p: ParserMonad<'a>) (constr: ^T -> 'a array -> 'answer) : ParserMonad<'answer> =
+        failwith "gencount: not implemented"
+
+    /// Run a parser within a bounded section of the input stream.
     let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
         parseMidi {
             let l = Array.zeroCreate (int n) // can't use array expression inside a CE (at least as is)

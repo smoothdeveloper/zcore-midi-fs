@@ -6,7 +6,7 @@ type word16 = uint16
 type word32 = uint32
 type bits7 = byte
 type midichannel = byte
-type [<Struct>] DeltaTime(value: int32) =
+type [<Struct>] DeltaTime(value: word32) =
     member x.Value = value
 
 type [<Struct>] word14(value: word16) =
