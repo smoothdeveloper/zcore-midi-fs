@@ -7,6 +7,10 @@
     <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\zmidi-fs-core.XML</DocumentationFile>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|netstandard2.0|AnyCPU'">
+    <Tailcalls>true</Tailcalls>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="DataTypes.fs" />
     <Compile Include="ExtraTypes.fs" />

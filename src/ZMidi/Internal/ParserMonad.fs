@@ -195,6 +195,16 @@ module ParserMonad =
     let parseError (genMessage : Pos -> string) : ParserMonad<'a> = 
         ParserMonad <| fun _ st -> Error (mkOtherParseError st genMessage)
 
+    let fmapM (modify: 'a -> 'b) (parser : ParserMonad<'a>) : ParserMonad<'b> = 
+        ParserMonad <| fun input state -> 
+            match apply1 parser input state with
+            | Error err -> Error err
+            | Ok (a, st2) -> Ok (modify a, st2)
+
+    /// Operator for fmapM
+    let ( <<| ) (modify: 'a -> 'b) (parser : ParserMonad<'a>) : ParserMonad<'b> = 
+       fmapM modify parser
+
     /// Run the parser, if it fails swap the error message.
     let inline ( <??> ) (parser : ParserMonad<'a>) (genMessage : Pos -> string) : ParserMonad<'a> = 
         ParserMonad <| fun input st -> 
@@ -301,66 +311,32 @@ module ParserMonad =
             work length state (fun msg -> Error msg) (fun st ac -> Ok (ac, st)) 
                 |> Result.map (fun (ans, st) -> (List.toArray ans, st))
 
-
     /// Run a parser within a bounded section of the input stream.
-    let repeatTillPosition (maxPosition: Pos) (p: ParserMonad<'a>) : ParserMonad<'a array> =
-        ParserMonad(fun data state ->
-            let results = ResizeArray()
-            let mutable firstError = Ok (Array.empty, state) 
-            let mutable lastState = state
-            let rec loop () =
-                if lastState.Position < int maxPosition then
-                    match apply1 p data lastState with
-                    | Ok (result, state) ->
-                        lastState <- state
-                        results.Add result
-                        loop ()
-                    | Error e ->
-                        firstError <- Error e
-
-            loop ()
-            match firstError with
-            | Ok _ ->
-                Ok(results.ToArray(), lastState)
-            | Error _ ->
-                firstError
-        )
-                        
-    let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
-        ParserMonad(fun data state ->
-            let result = Array.zeroCreate (int n)
-            let mutable lastState = state
-// revisit with a fold?
-            let mutable error = Ok (Unchecked.defaultof<_>,lastState)
-            let mutable i = LanguagePrimitives.GenericZero
-            let mutable errorOccured = false
-            logf "bound repeat %i" n
-
-            while i < n && not errorOccured do
-                logf "bound repeat %i/%i" i n
-  
-                match apply1 p data lastState with
-                | Ok (item,state) ->
-                    lastState <- state
-                    result.[int i] <- item
-                | (Error e) ->
-                    error <- Error e
-                    errorOccured <- true
-                i <- i + LanguagePrimitives.GenericOne
-            if errorOccured then
-                error
-            else
-                Ok (result, lastState)
-            )
+    let repeatTillPosition (maxPosition: Pos) (parser: ParserMonad<'a>) : ParserMonad<'a array> =
+        ParserMonad <| fun input state -> 
+            let limit = maxPosition
+            let rec work (st : State) 
+                        (fk : ParseError -> Result<'a list * State, ParseError>) 
+                        (sk : State -> 'a list  -> Result<'a list * State, ParseError>) = 
+                match apply1 parser input st with
+                | Error a -> fk a
+                | Ok(a1, st1) -> 
+                    match compare st1.Position limit with
+                    | 0 -> sk st1 [a1]
+                    | t when t > 0 -> fk (ParseError(st1.Position, Other "repeatTillPosition - too far"))
+                    | _ -> 
+                        work st1 fk (fun st2 ac ->
+                            sk st2 (a1 :: ac))
+            work state (fun msg -> Error msg) (fun st ac -> Ok (ac, st)) 
+                |> Result.map (fun (ans, st) -> (List.toArray ans, st))
 
     /// Apply the parser for /count/ times, derive the final answer
     /// from the intermediate list with the supplied function.
     let inline gencount (plen: ParserMonad<'T>) (p: ParserMonad<'a>) (constr: ^T -> 'a array -> 'answer) : ParserMonad<'answer> =
         parseMidi {
-          let! l = plen
-          logf "gen count: l: %i" l
-          let! items = boundRepeat l p
-          return constr l items
+          let! times = plen
+          let! arr = count (int times) p
+          return (constr times arr)
         }
 
     /// Drop a byte (word8).
