@@ -181,14 +181,15 @@ module ParserMonad =
     let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
         parseMidi {
             let l = Array.zeroCreate (int n) // can't use array expression inside a CE (at least as is)
-            for i in LanguagePrimitives.GenericZero .. (n - LanguagePrimitives.GenericOne) do
+            for (i: 'T) in LanguagePrimitives.GenericZero .. (n - LanguagePrimitives.GenericOne) do
               let! r = p
-              l.[i] <- r
+              l.[int i] <- r
             return l
         }
+
     /// Apply the parser for /count/ times, derive the final answer
     /// from the intermediate list with the supplied function.
-    let inline gencount plen p constr = //(plen: ParserMonad<'T>) (p: ParserMonad<'a>) (constr: ^T -> 'a array -> 'answer) : ParserMonad<'answer> =
+    let inline gencount (plen: ParserMonad<'T>) (p: ParserMonad<'a>) (constr: ^T -> 'a array -> 'answer) : ParserMonad<'answer> =
         parseMidi {
           let! l = plen
           let! items = boundRepeat l p
