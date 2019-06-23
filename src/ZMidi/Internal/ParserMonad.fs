@@ -64,7 +64,7 @@ module ParserMonad =
     let inline private delayM (fn:unit -> ParserMonad<'a>) : ParserMonad<'a> = 
         bindM (mreturn ()) fn 
 
-    let inline mfor (items: #seq<'a>) (fn: unit -> ParserMonad<'a>) : ParserMonad<#seq<'a>> = failwithf ""
+    let inline mfor (items: #seq<'a>) (fn: 'a -> ParserMonad<'b>) : ParserMonad<seq<'b>> = failwithf ""
 
 
     type ParserBuilder() = 
@@ -74,13 +74,13 @@ module ParserMonad =
         member self.Zero ()          = mzero ()
         member self.Combine (ma, mb) = mplus ma mb
 
-
         // inspired from http://www.fssnip.net/7UJ/title/ResultBuilder-Computational-Expression
         // probably broken
         member self.TryFinally(m, compensation) =
              try self.ReturnFrom(m)
              finally compensation()
-        member self.Delay(f: unit -> _) = f ()
+        
+        member self.Delay(f: unit -> ParserMonad<'a>) : ParserMonad<'a> = delayM f
         member self.Using(res:#System.IDisposable, body) =
               self.TryFinally(body res, fun () -> match res with null -> () | disp -> disp.Dispose())
         member self.While(guard, f) =
@@ -88,7 +88,7 @@ module ParserMonad =
                do f() |> ignore
                self.While(guard, f)
         member self.For(sequence:seq<_>, body) =
-               self.Using(sequence.GetEnumerator(), fun enum -> self.While(enum.MoveNext, self.Delay(fun () -> body enum.Current)))
+               self.Using(sequence.GetEnumerator(), fun enum -> self.While(enum.MoveNext, fun () -> self.Delay(fun () -> body enum.Current)))
 
     let (parseMidi:ParserBuilder) = new ParserBuilder()
 
@@ -178,13 +178,11 @@ module ParserMonad =
 
     let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
         parseMidi {
-          return [|
-          for i in LanguagePrimitives.GenericZero .. (n - LanguagePrimitives.GenericOne) do
-            //let! r = p
-            //yield r
-            failwith "boundRepeat: not implemented"
-            ()
-          |]
+            let l = Array.zeroCreate (int n) // can't use array expression inside a CE (at least as is)
+            for i in LanguagePrimitives.GenericZero .. (n - LanguagePrimitives.GenericOne) do
+              let! r = p
+              l.[i] <- r
+            return l
         }
 
     /// Drop a byte (word8).
