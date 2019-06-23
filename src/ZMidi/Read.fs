@@ -74,34 +74,38 @@ module ReadFile =
           let! _ = assertString "MTrk"
           return! readUInt32be
         }
+
     let textEvent textType =
       parseMidi {
+        let! a = assertWord8 2uy
+        let! b = peek
         let! text = getVarlenText
         return TextEvent(textType, text)
       }
+
     let metaEventSequenceNumber =
       parseMidi {
         let! a = assertWord8 2uy
         let! b = peek
         return SequenceNumber(word16be a b)
       }
-      
-    let metaEventGenericText =
-      parseMidi {
-        let! a = assertWord8 2uy
-        let! b = peek
-        return! textEvent GenericText
-      }
+
     let metaEvent i =
       parseMidi {
         match i with
-        | 0x00 -> return metaEventSequenceNumber
-        | 0x01 -> return metaEventGenericText
+        | 0x00 -> return! metaEventSequenceNumber
+        | 0x01 -> return! textEvent GenericText
+        | 0x02 -> return! textEvent CopyrightNotice
+        | 0x03 -> return! textEvent SequenceName
+        | 0x04 -> return! textEvent InstrumentName
+        | 0x05 -> return! textEvent Lyrics
+        | 0x06 -> return! textEvent Marker
+        | 0x07 -> return! textEvent CuePoint
       }
+
     let event : ParserMonad<MidiEvent> = 
       parseMidi {
         return! fatalError (Other "event: not implemented") }
-
 
     let deltaTime = 
       parseMidi {
@@ -123,14 +127,10 @@ module ReadFile =
             let! length = trackHeader
             return! messages length
         }
-    //let midiFile =
-    //  parseMidi {
-    //    let! header = P.header
-    //
-    //  }
 
-    //let readMidi filename =
-    //  ParserMonad.runParseMidi 
-    //let pitchBend ch = "pitch bend" <??> (PitchBend ch) <$> P.readWord14be
-
-    
+    let midiFile =
+      parseMidi {
+        let! header = header
+        let! tracks = count (header.trackCount) track
+        return { header = header; tracks = tracks }
+      }

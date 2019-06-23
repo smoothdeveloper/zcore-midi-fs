@@ -112,7 +112,7 @@ module ParserMonad =
             match apply1 parser input st with
             | Ok result -> Ok result
             | Error _ -> Error (ParseError(st.Position, Other (genMessage st.Position)))
-
+    
     let fatalError err =
       ParserMonad <| fun _ st -> Error (ParseError(st.Position, err))
 
@@ -159,27 +159,23 @@ module ParserMonad =
 
     /// Repeats a given <see paramref="parser"/> <see paramref="length"/> times.
     /// Fails with accumulated errors when any encountered.
-    let count (length : int) (parser : ParserMonad<'a>) : ParserMonad<'a []> =
+    let inline count (length : ^T) (parser : ParserMonad<'a>) : ParserMonad<'a []> =
         ParserMonad <| fun input state -> 
-            let rec work (i : int) 
+            let rec work (i : 'T) 
                          (st : State) 
                          (fk : ParseError -> Result<'a list * State, ParseError>) 
                          (sk : State -> 'a list  -> Result<'a list * State, ParseError>) = 
-                if i <= 0 then 
+                if i <= LanguagePrimitives.GenericZero then 
                     sk st []
                 else 
                     match apply1 parser input st with
                     | Error msg -> fk msg
                     | Ok (a1, st1) -> 
-                        work (i-1) st1 fk (fun st2 ac -> 
+                        work (i -  LanguagePrimitives.GenericOne) st1 fk (fun st2 ac -> 
                         sk st2 (a1 :: ac))
             work length state (fun msg -> Error msg) (fun st ac -> Ok (ac, st)) 
                 |> Result.map (fun (ans, st) -> (List.toArray ans, st))
 
-    /// Apply the parser for /count/ times, derive the final answer
-    /// from the intermediate list with the supplied function.
-    let inline gencount (plen: ParserMonad<'T>) (p: ParserMonad<'a>) (constr: ^T -> 'a array -> 'answer) : ParserMonad<'answer> =
-        failwith "gencount: not implemented"
 
     /// Run a parser within a bounded section of the input stream.
     let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
@@ -189,6 +185,14 @@ module ParserMonad =
               let! r = p
               l.[i] <- r
             return l
+        }
+    /// Apply the parser for /count/ times, derive the final answer
+    /// from the intermediate list with the supplied function.
+    let inline gencount plen p constr = //(plen: ParserMonad<'T>) (p: ParserMonad<'a>) (constr: ^T -> 'a array -> 'answer) : ParserMonad<'answer> =
+        parseMidi {
+          let! l = plen
+          let! items = boundRepeat l p
+          return constr l items
         }
 
     /// Drop a byte (word8).
