@@ -94,10 +94,7 @@ module ParserMonad =
 
     /// Run the parser on a file.
     let runParseMidi (ma : ParserMonad<'a>) (inputPath : string) : Result<'a, ParseError> = 
-        use stream  = File.Open(path = inputPath, mode = FileMode.Open, access = FileAccess.Read)
-        use memory = new MemoryStream()
-        stream.CopyTo(memory)
-        let input : byte [] = memory.ToArray()
+        let input = File.ReadAllBytes inputPath
         match apply1 ma input { Position = 0; RunningStatus = StatusOff} with
         | Ok (ans, _) -> Ok ans
         | Error msg -> Error msg
@@ -181,7 +178,7 @@ module ParserMonad =
     let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
         parseMidi {
             let l = Array.zeroCreate (int n) // can't use array expression inside a CE (at least as is)
-            for (i: 'T) in LanguagePrimitives.GenericZero .. (n - LanguagePrimitives.GenericOne) do
+            for (i: 'T) in LanguagePrimitives.GenericZero<'T> .. (n - LanguagePrimitives.GenericOne<'T>) do
               let! r = p
               l.[int i] <- r
             return l
