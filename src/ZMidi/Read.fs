@@ -7,7 +7,7 @@ module ReadFile =
     //let midiFile : Parser = ()
     open ZMidi.Internal.ParserMonad
     open ZMidi.Internal.Utils
-    
+    open ZMidi.Internal.ExtraTypes
 
     /// Apply parse then apply the check, if the check fails report
     /// the error message. 
@@ -27,7 +27,10 @@ module ReadFile =
     let inline clearBit (bit: int) (i: ^T) =
       let mask = ~~~ (LanguagePrimitives.GenericOne <<< bit)
       i &&& mask
-
+    let inline msbHigh i =
+      match i with
+      | TestBit 7 -> true
+      | _ -> false
     let assertString (s: string) =
       postCheck (readString s.Length) ((=) s) (Other (sprintf "assertString: expected '%s'" s))
 
@@ -36,10 +39,24 @@ module ReadFile =
 
     let assertWord8 i =
       postCheck readByte ((=) i) (Other (sprintf "assertWord8: expected '%i'" i))
-
+    
     let getVarlen : ParserMonad<word32> =
       parseMidi {
-        failwith "getVarlen: not imple"
+        let! a = readByte
+        if msbHigh a then
+          let! b = readByte
+          if msbHigh b then
+            let! c = readByte
+            if msbHigh c then
+              let! d = readByte
+              return fromVarlen (V4(a,b,c,d))
+            else
+              return fromVarlen (V3(a,b,c))
+          else
+            return fromVarlen (V2(a, b))
+        else
+          return fromVarlen (V1 a)
+
       }
     
     let getVarlenText = gencount getVarlen readChar (fun _ b -> System.String b)

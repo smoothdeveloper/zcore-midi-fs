@@ -30,9 +30,34 @@ module ParserMonad =
     type State = 
         { Position: Pos 
           RunningStatus: VoiceEvent
+          LastParse : obj
         }
-    
-    type ParseError = ParseError of position: Pos * message: ErrMsg
+        static member initial = { Position = 0; RunningStatus = VoiceEvent.StatusOff; LastParse = null }
+    type ParseError = 
+      ParseError of 
+        position: Pos 
+        * message: ErrMsg 
+        #if DEBUG
+        * lastToken : obj // need top level type, picking System.Object for now
+        #endif
+
+    let inline mkOtherParseError st (genMessage : Pos -> string) =
+      ParseError(
+        st.Position
+        , Other (genMessage st.Position)
+        #if DEBUG
+        , st.LastParse
+        #endif
+      )
+
+    let inline mkParseError st (errMsg: ErrMsg) =
+      ParseError(
+        st.Position
+        , errMsg
+        #if DEBUG
+        , st.LastParse
+        #endif
+      )
 
     type ParserMonad<'a> = 
         ParserMonad of (MidiData -> State -> Result<'a * State, ParseError> )
@@ -40,7 +65,13 @@ module ParserMonad =
     let inline private apply1 (parser : ParserMonad<'a>) 
                        (midiData : byte[])
                        (state : State)  :  Result<'a * State, ParseError> = 
-        let (ParserMonad fn) = parser in fn midiData state
+        let (ParserMonad fn) = parser 
+        let result = fn midiData state
+        match result with
+        | Ok (r, state) ->
+          let state = { state with LastParse = r }
+          Ok (r, state)
+        | Error e -> Error e
 
     let inline mreturn (x:'a) : ParserMonad<'a> = 
         ParserMonad <| fun _ st -> Ok (x, st)
@@ -53,7 +84,7 @@ module ParserMonad =
             | Ok (ans, st1) -> apply1 (next ans) input st1
 
     let mzero () : ParserMonad<'a> = 
-        ParserMonad <| fun _ state -> Error (ParseError(state.Position, EOF "mzero"))
+        ParserMonad <| fun _ state -> Error (mkParseError state (EOF "mzero"))
 
     let inline mplus (parser1 : ParserMonad<'a>) (parser2 : ParserMonad<'a>) : ParserMonad<'a> = 
         ParserMonad <| fun input state -> 
@@ -92,26 +123,28 @@ module ParserMonad =
 
     let (parseMidi:ParserBuilder) = new ParserBuilder()
 
+    let runParser (ma:ParserMonad<'a>) input initialState =
+      apply1 ma input initialState
+      |> Result.map fst
+
     /// Run the parser on a file.
     let runParseMidi (ma : ParserMonad<'a>) (inputPath : string) : Result<'a, ParseError> = 
-        let input = File.ReadAllBytes inputPath
-        match apply1 ma input { Position = 0; RunningStatus = StatusOff} with
-        | Ok (ans, _) -> Ok ans
-        | Error msg -> Error msg
+        runParser ma (File.ReadAllBytes inputPath) State.initial
+
 
     /// Throw a parse error
     let parseError (genMessage : Pos -> string) : ParserMonad<'a> = 
-        ParserMonad <| fun _ st -> Error (ParseError(st.Position, Other (genMessage st.Position)))
+        ParserMonad <| fun _ st -> Error (mkOtherParseError st genMessage)
 
     /// Run the parser, if it fails swap the error message.
     let ( <??> ) (parser : ParserMonad<'a>) (genMessage : Pos -> string) : ParserMonad<'a> = 
         ParserMonad <| fun input st -> 
             match apply1 parser input st with
             | Ok result -> Ok result
-            | Error _ -> Error (ParseError(st.Position, Other (genMessage st.Position)))
+            | Error _ -> Error(mkOtherParseError st genMessage)
     
     let fatalError err =
-      ParserMonad <| fun _ st -> Error (ParseError(st.Position, err))
+      ParserMonad <| fun _ st -> Error (mkParseError st err)
 
     let getRunningEvent : ParserMonad<VoiceEvent> = 
         ParserMonad <| fun _ st -> Ok (st.RunningStatus , st)
@@ -134,9 +167,9 @@ module ParserMonad =
                 try 
                   match input,state with
                   | PositionValid -> f input state
-                  | PositionInvalid -> Error (ParseError(state.Position, EOF name))
+                  | PositionInvalid -> Error (mkParseError state (EOF name))
                 with
-                | e -> Error (ParseError(state.Position, (Other (sprintf "%A" e))))
+                | e -> Error (mkParseError state (Other (sprintf "%A" e)))
             )
 
     let peek : ParserMonad<byte> =

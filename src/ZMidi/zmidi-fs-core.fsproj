@@ -8,6 +8,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DataTypes.fs" />
+    <Compile Include="ExtraTypes.fs" />
     <Compile Include="Internal\Utils.fs" />
     <Compile Include="Internal\ParserMonad.fs" />
     <Compile Include="Read.fs" />
