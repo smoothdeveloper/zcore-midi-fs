@@ -142,7 +142,44 @@ module ParserMonad =
             match apply1 parser input st with
             | Ok result -> Ok result
             | Error _ -> Error(mkOtherParseError st genMessage)
+
+    let (>>=) (m: ParserMonad<'a>) (k: 'a -> ParserMonad<'b>) : ParserMonad<'b> =
+      bindM m k
+   
+    ///
+    let fmap (f: 'a -> 'b) (p: ParserMonad<'a>) : ParserMonad<'b> =
+      parseMidi {
+        let! a = p
+        return (f a)
+      }
+    let inline ( <~> (* <$> *) ) (a) b = fmap a b
+    let ( *> ) (a: ParserMonad<'a>) (b: 'a -> ParserMonad<'b>) : ParserMonad<'b> = 
+      parseMidi {
+        let! a = a
+        return! (b a)
+      }
+
+    // http://hackage.haskell.org/package/base-4.12.0.0/docs/src/GHC.Base.html#%3C%24
+    /// Replace all locations in the input with the same value.
+    /// The default definition is @'fmap' . 'const'@, but this may be
+    /// overridden with a more efficient version.
+    let inline ( <~ (* <$ *) ) (a: 'a) (b: ParserMonad<'b>) : ParserMonad<'a> =
+      (*let konst k _ = k
+      let x = fmap a b
+      konst x b*)
+      failwithf ""
+      //(fmap >> konst) a b
     
+    /// Sequence actions, discarding the value of the first argument.
+    //let liftA2 f x = (<*>) (fmap f x)
+
+    //let ( <*> ) = liftA2 id
+    //let ( *> ) a1 a2 =
+    //
+    //  (id <~ a1) <*> a2
+    //  
+      
+
     let fatalError err =
       ParserMonad <| fun _ st -> Error (mkParseError st err)
 
@@ -232,8 +269,8 @@ module ParserMonad =
             fun input st -> Ok ((), { st with Position = st.Position + 1 })
 
     /// Parse a byte (Word8).
-    let readByte : ParserMonad<byte>= 
-        checkedParseM "dropByte" <| 
+    let readByte : ParserMonad<byte> = 
+        checkedParseM "readByte" <| 
             fun input st ->
                 let a1 = input.[st.Position]
                 Ok (a1, { st with Position = st.Position + 1 })

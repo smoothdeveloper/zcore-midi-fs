@@ -20,6 +20,9 @@ module ReadFile =
           return! fatalError errorMessage
       }
 
+
+
+
     let inline (|TestBit|_|) (bit: int) (i: ^T) =
       let mask = LanguagePrimitives.GenericOne <<< bit
       if mask &&& i = mask then Some () else None
@@ -39,25 +42,64 @@ module ReadFile =
 
     let assertWord8 i =
       postCheck readByte ((=) i) (Other (sprintf "assertWord8: expected '%i'" i))
-    
+
     let getVarlen : ParserMonad<word32> =
+      let rec loop acc =
+        parseMidi {
+          let! b = readByte
+          
+          if msbHigh b then
+            let result = (b &&& 0x7fuy)
+            return! loop (acc + ((uint64 (result)) * 128UL ))
+          else
+            return (acc + (uint64 b)) }  
       parseMidi {
-        let! a = readByte
-        if msbHigh a then
+        let! result = loop 0UL
+        return (uint32 result) }
+      
+    
+      (*
+      let step3 a b = 
+        parseMidi { 
+          let! c = readByte
+          if msbHigh c then
+            let! d = readByte
+            return V4 (a,b,c,d)
+          else
+            return V3 (a,b,c) }
+      let step2 a = parseMidi {
           let! b = readByte
           if msbHigh b then
-            let! c = readByte
-            if msbHigh c then
-              let! d = readByte
-              return fromVarlen (V4(a,b,c,d))
-            else
-              return fromVarlen (V3(a,b,c))
-          else
-            return fromVarlen (V2(a, b))
-        else
-          return fromVarlen (V1 a)
+              return! step3 a b 
+          else 
+            return V2 (a,b) }
+      
+      parseMidi {
+        let! a = readByte 
+        if msbHigh a then 
+          let! r = step2 a
+          return (ZMidi.Internal.ExtraTypes.fromVarlen r)
+        else 
+          return (ZMidi.Internal.ExtraTypes.fromVarlen (V1 a))
 
-      }
+        //return result
+          //>>= (fun a ->)
+        //let! a = readByte
+        //if msbHigh a then
+        //  let! b = readByte
+        //  if msbHigh b then
+        //    let! c = readByte
+        //    if msbHigh c then
+        //      let! d = readByte
+        //      return fromVarlen (V4(a,b,c,d))
+        //    else
+        //      return fromVarlen (V3(a,b,c))
+        //  else
+        //    return fromVarlen (V2(a, b))
+        //else
+        //  return fromVarlen (V1 a)
+
+      }*)
     
     let getVarlenText = gencount getVarlen readChar (fun _ b -> System.String b)
 
@@ -119,9 +161,46 @@ module ReadFile =
         | 0x06 -> return! textEvent Marker
         | 0x07 -> return! textEvent CuePoint
       }
+//    let (<*>) af ma =
 
-    let event : ParserMonad<MidiEvent> = 
+
+    let runningStatus : ParserMonad<MidiRunningStatus> = 
       parseMidi {
+      
+        return MidiRunningStatus.ON
+      }
+    //let metaEvent n = //: ParserMonad<MetaEvent> =
+    //  match n with
+    //  ///| 0x00uy -> ( SequenceNumber <~> (assertWord8 2uy *> word16be)) <??> (sprintf "sequence number: failed at %i" )
+    //  | 0x01uy -> (textEvent GenericText)     <??> (sprintf "generic text: failed at %i")
+    //  | 0x02uy -> (textEvent CopyrightNotice) <??> (sprintf "generic text: failed at %i")
+    //  | 0x03uy -> (textEvent SequenceName)    <??> (sprintf "generic text: failed at %i")
+    //  | 0x04uy -> (textEvent InstrumentName)  <??> (sprintf "generic text: failed at %i")
+    //  | 0x05uy -> (textEvent Lyrics)          <??> (sprintf "generic text: failed at %i")
+    //  | 0x06uy -> (textEvent Marker)          <??> (sprintf "generic text: failed at %i")
+    //  | 0x07uy -> (textEvent CuePoint)        <??> (sprintf "generic text: failed at %i")
+    //  //| 0x20uy -> (textEvent GenericText)     <??> (sprintf "generic text: failed at %i")
+    //  | _ -> failwithf "metaEvent %i" n
+
+      //parseMidi {
+      //  
+      //}
+    let event : ParserMonad<MidiEvent> = 
+      let step n : ParserMonad<MidiMetaEvent>= 
+        //parseMidi {
+          match n with
+          | 0xffuy -> failwithf "" //MetaEvent <~> (dropByte *> (readByte >>= metaEvent))
+          //| 0xf7uy -> ()//SysexEvent
+          //| 0xf0uy -> ()//SysexEvent
+          //| 0x80uy -> ()//VoiceEvent
+          //| n when n >= 0xf8uy -> ()//SysRealtimeEvent
+          //| n when n >= 0xf1uy -> ()//SysCommonEvent
+          //| n when n >= 0x80uy -> ()//VoiceEvent
+          //| _      -> getRunningEvent >>= runningStatus
+        //}
+      parseMidi {
+        let! p = peek
+        step p
         return! fatalError (Other "event: not implemented") }
 
     let deltaTime = 

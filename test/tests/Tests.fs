@@ -7,13 +7,20 @@ let tests =
   test "parseVarlen" {
       let cases = 
         [|
-          {| input = [| 0x00uy |]; expected = 0u |}
-          {| input = [| 0x7fuy |]; expected = 127u |}
-          {| input = [| 0x80uy |]; expected = 128u |}
-          {| input = [| 0x03uy; 0xe8uy |]; expected = 1000u |}
-          {| input = [| 0x3fuy; 0xffuy |]; expected = 16383u |}
-          {| input = [| 0x0fuy; 0x42uy; 0x40uy |]; expected = 100000u |}
+          //{| expected = 0x00000000u; input = [|0x00uy|] |}
+          //{| expected = 0x00000040u; input = [|0x40uy|] |}
+          //{| expected = 0x0000007fu; input = [|0x7fuy|] |}
+          {| expected = 0x00000080u; input = [|0x81uy; 0x00uy|] |}
+          {| expected = 0x00002000u; input = [|0xc0uy; 0x00uy|] |}
+          {| expected = 0x00003fffu; input = [|0xffuy; 0x7fuy|] |}
+          {| expected = 0x00004000u; input = [|0x81uy; 0x80uy; 0x00uy|] |}
+          {| expected = 0x00100000u; input = [|0xc0uy; 0x80uy; 0x00uy|] |}
+          {| expected = 0x001fffffu; input = [|0xffuy; 0xffuy; 0x7fuy|] |}
+          {| expected = 0x00200000u; input = [|0x81uy; 0x80uy; 0x80uy; 0x00uy|] |}
+          {| expected = 0x08000000u; input = [|0xc0uy; 0x80uy; 0x80uy; 0x00uy|] |}
+          {| expected = 0x0fffffffu; input = [|0xffuy; 0xffuy; 0xffuy; 0x7fuy|] |}
         |]
+
 
       let state = State.initial
 
