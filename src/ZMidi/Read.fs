@@ -3,8 +3,6 @@ namespace ZMidi
 open ZMidi.DataTypes
 
 module ReadFile =
-    //let readMidi filename =
-    //let midiFile : Parser = ()
     open ZMidi.Internal.ParserMonad
     open ZMidi.Internal.Utils
     open ZMidi.Internal.ExtraTypes
@@ -19,9 +17,6 @@ module ReadFile =
         else 
           return! fatalError errorMessage
       }
-
-
-
 
     let inline (|TestBit|_|) (bit: int) (i: ^T) =
       let mask = LanguagePrimitives.GenericOne <<< bit
@@ -47,60 +42,16 @@ module ReadFile =
       let rec loop acc =
         parseMidi {
           let! b = readByte
-          
+          let acc = acc <<< 7
           if msbHigh b then
-            let result = (b &&& 0x7fuy)
-            return! loop (acc + ((uint64 (result)) * 128UL ))
+            let result = uint64 (b &&& 0b01111111uy)
+            return! loop (acc + result)
           else
             return (acc + (uint64 b)) }  
       parseMidi {
         let! result = loop 0UL
         return (uint32 result) }
       
-    
-      (*
-      let step3 a b = 
-        parseMidi { 
-          let! c = readByte
-          if msbHigh c then
-            let! d = readByte
-            return V4 (a,b,c,d)
-          else
-            return V3 (a,b,c) }
-      let step2 a = parseMidi {
-          let! b = readByte
-          if msbHigh b then
-              return! step3 a b 
-          else 
-            return V2 (a,b) }
-      
-      parseMidi {
-        let! a = readByte 
-        if msbHigh a then 
-          let! r = step2 a
-          return (ZMidi.Internal.ExtraTypes.fromVarlen r)
-        else 
-          return (ZMidi.Internal.ExtraTypes.fromVarlen (V1 a))
-
-        //return result
-          //>>= (fun a ->)
-        //let! a = readByte
-        //if msbHigh a then
-        //  let! b = readByte
-        //  if msbHigh b then
-        //    let! c = readByte
-        //    if msbHigh c then
-        //      let! d = readByte
-        //      return fromVarlen (V4(a,b,c,d))
-        //    else
-        //      return fromVarlen (V3(a,b,c))
-        //  else
-        //    return fromVarlen (V2(a, b))
-        //else
-        //  return fromVarlen (V1 a)
-
-      }*)
-    
     let getVarlenText = gencount getVarlen readChar (fun _ b -> System.String b)
 
     let fileFormat =
