@@ -7,7 +7,7 @@ module ParserMonad =
 
     open ZMidi.Internal.Utils
 
-    /// Status is either OFF of the previous VoiceEvent * Channel.
+    /// Status is either OFF or the previous VoiceEvent * Channel.
     type VoiceEvent = 
         | StatusOff
         | NoteOn            of byte

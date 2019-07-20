@@ -53,7 +53,13 @@ module ReadFile =
         return (uint32 result) }
       
     let getVarlenText = gencount getVarlen readChar (fun _ b -> System.String b)
-
+    let getVarlenBytes = gencount getVarlen readByte (fun _ b -> b)
+    let deltaTime = 
+      parseMidi {
+          let! v = getVarlen
+          return DeltaTime(v)
+      } <??> (fun p -> "delta time")
+    
     let fileFormat =
         parseMidi {
             match! readUInt16be with
@@ -103,23 +109,18 @@ module ReadFile =
     let metaEvent i =
       parseMidi {
         match i with
-        | 0x00 -> return! metaEventSequenceNumber
-        | 0x01 -> return! textEvent GenericText
-        | 0x02 -> return! textEvent CopyrightNotice
-        | 0x03 -> return! textEvent SequenceName
-        | 0x04 -> return! textEvent InstrumentName
-        | 0x05 -> return! textEvent Lyrics
-        | 0x06 -> return! textEvent Marker
-        | 0x07 -> return! textEvent CuePoint
+        | 0x00uy -> return! metaEventSequenceNumber
+        | 0x01uy -> return! textEvent GenericText
+        | 0x02uy -> return! textEvent CopyrightNotice
+        | 0x03uy -> return! textEvent SequenceName
+        | 0x04uy -> return! textEvent InstrumentName
+        | 0x05uy -> return! textEvent Lyrics
+        | 0x06uy -> return! textEvent Marker
+        | 0x07uy -> return! textEvent CuePoint
       }
 //    let (<*>) af ma =
 
 
-    let runningStatus : ParserMonad<MidiRunningStatus> = 
-      parseMidi {
-      
-        return MidiRunningStatus.ON
-      }
     //let metaEvent n = //: ParserMonad<MetaEvent> =
     //  match n with
     //  ///| 0x00uy -> ( SequenceNumber <~> (assertWord8 2uy *> word16be)) <??> (sprintf "sequence number: failed at %i" )
@@ -136,34 +137,223 @@ module ReadFile =
       //parseMidi {
       //  
       //}
+
+//sysExContPackets = 
+//  deltaTime >>= \dt -> getVarlenBytes (,) >>= \(n,xs) -> 
+//  let ans1 = MidiSysExContPacket dt n xs
+//  in if isTerminated xs then return [ans1]
+//                        else sysExContPackets >>= \ks -> 
+//                             return $ ans1:ks
+
+    let isTerminated bytes =
+      bytes 
+      |> Array.tryFind ((=) 0xf7uy) 
+      |> function | Some i -> true
+                  | None -> false
+
+    let rec sysExContPackets =
+      parseMidi {
+        let! d = deltaTime
+        let! b = getVarlenBytes
+        let answer = MidiSysExContPacket (d, b)
+        if isTerminated b then return List.singleton answer
+                          else 
+                            let! answer2 = sysExContPackets
+                            return (answer :: answer2)
+      }
+    let sysExEvent =
+      parseMidi {
+        let! b = getVarlenBytes
+        if isTerminated b then
+          return SysExSingle b
+        else
+          let! cont = sysExContPackets
+          return SysExCont(b, cont)
+      } <??> (fun _ -> "sysExEvent")
+    let sysExEscape = 
+      parseMidi {
+        let! bytes = getVarlenBytes
+        return SysExEscape bytes
+      } <??> (fun _ -> "sysExEscape")
+    let impossibleMatch text =
+      fatalError (ErrMsg.Other (sprintf "impossible match: %s" text))
+
+    let sysCommonEvent n =
+      match n with
+      | 0xf1uy -> readByte >>= (QuarterFrame >> mreturn) <??> (fun p -> "quarter frame")
+      | 0xf2uy -> 
+        parseMidi {
+          let! a = readByte
+          let! b = readByte
+          return SongPosPointer(a,b)
+        } <??> (fun p -> "song pos. pointer")
+      | 0xf3uy -> readByte >>= (QuarterFrame >> mreturn) <??> (fun p -> "song select")
+      | 0xf4uy -> mreturn UndefinedF4
+      | 0xf5uy -> mreturn UndefinedF5
+      | 0xf6uy -> mreturn TuneRequest
+      | 0xf7uy -> mreturn EOX
+      | tag -> impossibleMatch (sprintf "sysCommonEvent %x" tag)
+
+    let sysRealtimeEvent n =
+      match n with
+      | 0xf8uy -> mreturn TimingClock
+      | 0xf9uy -> mreturn TimingClock
+      | 0xfauy -> mreturn TimingClock
+      | 0xfbuy -> mreturn TimingClock
+      | 0xfcuy -> mreturn TimingClock
+      | 0xfduy -> mreturn TimingClock
+      | 0xfeuy -> mreturn TimingClock
+      | 0xffuy -> mreturn TimingClock
+      | tag ->  impossibleMatch (sprintf "sysRealtimeEvent %x" tag)
+
+    let inline (|SB|) b =
+      b &&& 0xf0uy, b &&& 0x0fuy
+
+    let noteOff ch =
+      parseMidi {
+        let! a = readByte
+        let! b = readByte
+        return MidiVoiceEvent.NoteOff(ch, a, b)
+      } <??> (fun p -> "note-off")
+
+    let noteOn ch =
+      parseMidi {
+        let! a = readByte
+        let! b = readByte
+        return MidiVoiceEvent.NoteOn(ch, a, b)
+      } <??> (fun p -> "note-on")
+
+    let noteAftertouch ch =
+      parseMidi {
+        let! a = readByte
+        let! b = readByte
+        return MidiVoiceEvent.NoteAfterTouch(ch, a, b)
+      } <??> (fun p -> "noteAftertouch")
+
+    let controller ch =
+      parseMidi {
+        let! a = readByte
+        let! b = readByte
+        return MidiVoiceEvent.Controller(ch, a, b)
+      } <??> (fun p -> "controller")
+
+    let programChange ch =
+      parseMidi {
+        let! a = readByte
+        return MidiVoiceEvent.ProgramChange(ch, a)
+      } <??> (fun p -> "controller")
+
+    let channelAftertouch ch =
+      parseMidi {
+        let! a = readByte
+        return MidiVoiceEvent.ChannelAftertouch(ch, a)
+      } <??> (fun p -> "channelAftertouch")
+    let pitchBend ch =
+      parseMidi {
+        let! a = readWord14be
+        return MidiVoiceEvent.PitchBend(ch, a)
+      } <??> (fun p -> "pitchBend")
+
+
+    let voiceEvent n =
+      match n with
+      | SB(0x80uy, ch) -> parseMidi { do! setRunningEvent (NoteOff ch)
+                                      return! noteOff ch }
+      | SB(0x90uy, ch) -> parseMidi { do! setRunningEvent (NoteOn ch)
+                                      return! noteOn ch }
+      | SB(0xa0uy, ch) -> parseMidi { do! setRunningEvent (NoteAftertoucuh ch)
+                                      return! noteAftertouch ch }
+      | SB(0xb0uy, ch) -> parseMidi { do! setRunningEvent (Control ch)
+                                      return! controller ch }
+      | SB(0xc0uy, ch) -> parseMidi { do! setRunningEvent (Program ch)
+                                      return! programChange ch }
+      | SB(0xd0uy, ch) -> parseMidi { do! setRunningEvent (ChannelAftertouch ch)
+                                      return! channelAftertouch ch }
+      | SB(0xe0uy, ch) -> parseMidi { do! setRunningEvent (PitchBend ch)
+                                      return! pitchBend ch }
+      | otherwise -> impossibleMatch (sprintf "voiceEvent: %x" otherwise)
+    let runningStatus (event: VoiceEvent) : ParserMonad<MidiEvent> = 
+      let mVoiceEvent e = mreturn (VoiceEvent(MidiRunningStatus.ON, e))
+      match event with
+      | NoteOff           ch -> (noteOff ch)           >>= mVoiceEvent
+      | NoteOn            ch -> (noteOn ch)            >>= mVoiceEvent
+      | NoteAftertoucuh   ch -> (noteAftertouch ch)    >>= mVoiceEvent
+      | Control           ch -> (controller ch)        >>= mVoiceEvent
+      | Program           ch -> (programChange ch)     >>= mVoiceEvent
+      | ChannelAftertouch ch -> (channelAftertouch ch) >>= mVoiceEvent
+      | PitchBend         ch -> (pitchBend ch)         >>= mVoiceEvent
+      | StatusOff            -> readByte >>= (MidiEventOther >> mreturn)
+      //parseMidi {
+      //
+      //  //return MidiRunningStatus.ON
+      //}
+      
+      (*
+event :: ParserM MidiEvent
+event = peek >>= step
+  where
+    -- 00..7f  -- /data/
+    step n
+      | n == 0xFF  = MetaEvent         <$> (dropW8 *> (word8 >>= metaEvent))
+      | n >= 0xF8  = SysRealTimeEvent  <$> (dropW8 *> sysRealTimeEvent n)
+      | n == 0xF7  = SysExEvent        <$> (dropW8 *> sysExEscape)
+      | n >= 0xF1  = SysCommonEvent    <$> (dropW8 *> sysCommonEvent n)
+      | n == 0xF0  = SysExEvent        <$> (dropW8 *> sysExEvent)
+      | n >= 0x80  = VoiceEvent RS_OFF <$> (dropW8 *> voiceEvent (splitByte n))
+      | otherwise  = getRunningEvent >>= runningStatus
+      *)
+
+    /// Parse an event - for valid input this function should parse
+    /// without error (i.e all cases of event types are fully 
+    /// enumerated). 
+    ///
+    /// Malformed input (syntactically bad events, or truncated data) 
+    /// can cause fatal parse errors.
+    
     let event : ParserMonad<MidiEvent> = 
-      let step n : ParserMonad<MidiMetaEvent>= 
-        //parseMidi {
+      //let foo = (readByte >>= metaEvent)
+      let step n : ParserMonad<MidiEvent>= 
+        parseMidi {
           match n with
-          | 0xffuy -> failwithf "" //MetaEvent <~> (dropByte *> (readByte >>= metaEvent))
-          //| 0xf7uy -> ()//SysexEvent
-          //| 0xf0uy -> ()//SysexEvent
-          //| 0x80uy -> ()//VoiceEvent
-          //| n when n >= 0xf8uy -> ()//SysRealtimeEvent
-          //| n when n >= 0xf1uy -> ()//SysCommonEvent
-          //| n when n >= 0x80uy -> ()//VoiceEvent
-          //| _      -> getRunningEvent >>= runningStatus
-        //}
+          | 0xffuy -> 
+            do! dropByte
+            let! event = readByte >>= metaEvent
+            return MetaEvent event
+            //MetaEvent <~> (dropByte *> (fun _ -> (readByte >>= metaEvent))) // failwithf "event ff"
+          | 0xf7uy -> 
+            do! dropByte
+            let! sysexEvent = sysExEscape
+            return SysExEvent sysexEvent
+          | 0xf0uy ->
+            do! dropByte
+            let! sysexEvent = sysExEvent
+            return SysExEvent sysexEvent
+          | x when x >= 0xf8uy ->
+            do! dropByte
+            let! event = sysRealtimeEvent x
+            return SysRealtimeEvent event
+          | x when x >= 0xf1uy ->
+            do! dropByte
+            let! event = sysCommonEvent x
+            return SysCommonEvent event
+          | x when x >= 0x80uy ->
+            do! dropByte
+            let! voiceEvent = voiceEvent x
+            return VoiceEvent(MidiRunningStatus.OFF, voiceEvent)
+          | otherwise ->
+            return! (getRunningEvent >>= runningStatus)
+
+        }
       parseMidi {
         let! p = peek
-        step p
-        return! fatalError (Other "event: not implemented") }
-
-    let deltaTime = 
-      parseMidi {
-          return! getVarlen
-      } <??> (fun p -> "delta time")
+        return! step p 
+      }
 
     let message = 
         parseMidi {
           let! deltaTime = deltaTime
           let! event = event
-          return { timestamp = DeltaTime(deltaTime); event = event }
+          return { timestamp = deltaTime; event = event }
         }
     let messages i = 
       parseMidi {

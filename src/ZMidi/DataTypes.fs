@@ -100,7 +100,7 @@ and MidiVoiceEvent =
     ///
     /// > D0 to DF (0 to F is channel number) * pressure_value
     ///    
-    | ChannelAfterTouch of status: bits7 * pressure: bits7
+    | ChannelAftertouch of status: bits7 * pressure: bits7
 
     /// Pitch bend 
     /// 
@@ -150,7 +150,7 @@ and MidiSysExEvent =
   ///
   /// > F0 * length * packet1 ... [SysExContPacket]
   ///
-  | SysExCont of byte array * MidiSysExContPacket array
+  | SysExCont of byte array * MidiSysExContPacket list
 
   /// Escape sequence of one-or-more SysEx events.
   ///
