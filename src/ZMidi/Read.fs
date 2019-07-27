@@ -98,6 +98,14 @@ module ReadFile =
         let! text = getVarlenText
         return TextEvent(textType, text)
       }
+      
+    let scale =
+      parseMidi {
+        match! readByte with
+        | 0uy -> return MidiScaleType.Major
+        | 1uy -> return MidiScaleType.Minor
+        | other -> return MidiScaleType.OtherScale other
+      }
 
     let metaEventSequenceNumber =
       parseMidi {
@@ -105,18 +113,84 @@ module ReadFile =
         let! b = peek
         return SequenceNumber(word16be a b)
       }
+      
+    let metaEventChannelPrefix =
+      parseMidi {
+        let! _ = assertWord8 0x01uy
+        let! b = readByte
+        return ChannelPrefix b        
+      }
 
+    let metaEventMidiPort =
+      parseMidi {
+        let! _ = assertWord8 0x01uy
+        let! b = readByte
+        return MidiPort b   
+      }
+    let metaEventEndOfTrack =
+      parseMidi {
+        let! _ = assertWord8 0uy
+        return EndOfTrack
+      }
+    let metaEventSetTempo =
+      parseMidi {
+        let! _ = assertWord8 3uy
+        let! a = readWord24be
+        return SetTempo a
+      }
+      
+    let metaEventSmpteOffset =
+      parseMidi {
+        let! _ = assertWord8 5uy
+        let! a = readByte
+        let! b = readByte
+        let! c = readByte
+        let! d = readByte
+        let! e = readByte
+        return SMPTEOffset(a,b,c,d,e)
+      }
+    let metaEventTimeSignature =
+      parseMidi {
+        let! _ = assertWord8 4uy
+        let! a = readByte
+        let! b = readByte
+        let! c = readByte
+        let! d = readByte
+        return TimeSignature(a,b,c,d)
+      }
+      
+    let metaEventKeySignature =
+      parseMidi {
+        let! _ = assertWord8 2uy
+        let! a = readByte
+        let a = int8 a
+        let! b = scale
+        return KeySignature(a,b)
+      }
+      
     let metaEvent i =
+      let konst k _ = k
       parseMidi {
         match i with
-        | 0x00uy -> return! metaEventSequenceNumber
-        | 0x01uy -> return! textEvent GenericText
-        | 0x02uy -> return! textEvent CopyrightNotice
-        | 0x03uy -> return! textEvent SequenceName
-        | 0x04uy -> return! textEvent InstrumentName
-        | 0x05uy -> return! textEvent Lyrics
-        | 0x06uy -> return! textEvent Marker
-        | 0x07uy -> return! textEvent CuePoint
+        | 0x00uy -> return! metaEventSequenceNumber    <??> (konst "sequence number")
+        | 0x01uy -> return! textEvent GenericText      <??> (konst "generic text")
+        | 0x02uy -> return! textEvent CopyrightNotice  <??> (konst "copyright notice")
+        | 0x03uy -> return! textEvent SequenceName     <??> (konst "sequence name")
+        | 0x04uy -> return! textEvent InstrumentName   <??> (konst "instrument name")
+        | 0x05uy -> return! textEvent Lyrics           <??> (konst "lyrics")
+        | 0x06uy -> return! textEvent Marker           <??> (konst "marker")
+        | 0x07uy -> return! textEvent CuePoint         <??> (konst "cue point")
+        | 0x20uy -> return! metaEventChannelPrefix     <??> (konst "channel prefix")
+        | 0x21uy -> return! metaEventMidiPort          <??> (konst "midi port")
+        | 0x2fuy -> return! metaEventEndOfTrack        <??> (konst "end of track")
+        | 0x51uy -> return! metaEventSetTempo          <??> (konst "set tempo")
+        | 0x54uy -> return! metaEventSmpteOffset       <??> (konst "smpte offset")
+        | 0x58uy -> return! metaEventTimeSignature     <??> (konst "time signature")
+        | 0x59uy -> return! metaEventKeySignature      <??> (konst "key signature")
+        | 0x7fuy -> let! bytes = getVarlenBytes <??> (konst "system specific meta event")
+                    return SSME bytes
+        | other  -> let! bytes = getVarlenBytes <??> (konst (sprintf "meta other %x" other))
+                    return MetaOther(other, bytes)
       }
 //    let (<*>) af ma =
 
@@ -311,15 +385,13 @@ event = peek >>= step
     /// can cause fatal parse errors.
     
     let event : ParserMonad<MidiEvent> = 
-      //let foo = (readByte >>= metaEvent)
-      let step n : ParserMonad<MidiEvent>= 
+      let step n : ParserMonad<MidiEvent> = 
         parseMidi {
           match n with
           | 0xffuy -> 
             do! dropByte
             let! event = readByte >>= metaEvent
             return MetaEvent event
-            //MetaEvent <~> (dropByte *> (fun _ -> (readByte >>= metaEvent))) // failwithf "event ff"
           | 0xf7uy -> 
             do! dropByte
             let! sysexEvent = sysExEscape

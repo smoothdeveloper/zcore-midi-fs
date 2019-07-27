@@ -26,18 +26,35 @@ module ParserMonad =
     type ErrMsg = 
       | EOF of where: string
       | Other of error: string
-
+      | Exn of error: exn
+      
     type State = 
         { Position: Pos 
           RunningStatus: VoiceEvent
+          #if DEBUG_LASTPARSE
           LastParse : obj
+          #endif
         }
-        static member initial = { Position = 0; RunningStatus = VoiceEvent.StatusOff; LastParse = null }
+        static member initial =
+            { Position = 0
+              RunningStatus = VoiceEvent.StatusOff
+              #if DEBUG_LASTPARSE
+              LastParse = null
+              #endif
+            }
+        override x.ToString () =
+            #if DEBUG_LASTPARSE
+            sprintf "(Pos:%i;Status:%30s;LastParse:%50s)" x.Position (sprintf "%A" x.RunningStatus)
+                
+                (sprintf "%A" x.LastParse)
+            #else
+            sprintf "(Pos:%i;Status:%30s)" x.Position (sprintf "%A" x.RunningStatus)
+            #endif
     type ParseError = 
       ParseError of 
         position: Pos 
         * message: ErrMsg 
-        #if DEBUG
+        #if DEBUG_LASTPARSE
         * lastToken : obj // need top level type, picking System.Object for now
         #endif
 
@@ -45,7 +62,7 @@ module ParserMonad =
       ParseError(
         st.Position
         , Other (genMessage st.Position)
-        #if DEBUG
+        #if DEBUG_LASTPARSE
         , st.LastParse
         #endif
       )
@@ -54,7 +71,7 @@ module ParserMonad =
       ParseError(
         st.Position
         , errMsg
-        #if DEBUG
+        #if DEBUG_LASTPARSE
         , st.LastParse
         #endif
       )
@@ -62,17 +79,38 @@ module ParserMonad =
     type ParserMonad<'a> = 
         ParserMonad of (MidiData -> State -> Result<'a * State, ParseError> )
 
+    let inline logf format =
+        
+        printfn format
     let inline private apply1 (parser : ParserMonad<'a>) 
                        (midiData : byte[])
                        (state : State)  :  Result<'a * State, ParseError> = 
         let (ParserMonad fn) = parser 
-        let result = fn midiData state
-        match result with
-        | Ok (r, state) ->
-          let state = { state with LastParse = r }
-          Ok (r, state)
-        | Error e -> Error e
-
+        try
+            let result = fn midiData state
+            match result with
+            | Ok (r, state) ->
+              logf "parse ok: %50s %O" (sprintf "%A" r) state
+              #if DEBUG_LASTPARSE
+              let state = { state with LastParse = r }
+              #endif
+              Ok (r, state)
+            | Error e ->
+                logf "parse error: %50s %O" (sprintf "%A" e) state
+                Error e
+        with e ->
+            logf "parse FATAL error: %50s %O" (sprintf "%A" e) state
+            Error (
+                      
+                      ParseError(
+                                    state.Position
+                                    , ErrMsg.Exn e
+                                    #if DEBUG_LASTPARSE
+                                    , state.LastParse
+                                    #endif
+                                )
+                  )
+            
     let inline mreturn (x:'a) : ParserMonad<'a> = 
         ParserMonad <| fun _ st -> Ok (x, st)
 
@@ -290,7 +328,7 @@ module ParserMonad =
         }
         <??> sprintf "readString failed at %i"
 
-    // Parse a uint16 (big endian).
+    /// Parse a uint16 (big endian).
     let readUInt16be : ParserMonad<uint16>= 
         parseMidi { 
             let! a = readByte
@@ -299,7 +337,7 @@ module ParserMonad =
             }
         <??> sprintf "uint16be: failed at %i"
 
-    // Parse a word14 (big endian) from 2 consecutive bytes.
+    /// Parse a word14 (big endian) from 2 consecutive bytes.
     let readWord14be = 
         parseMidi {
             let! a = readByte
@@ -308,7 +346,7 @@ module ParserMonad =
             }
         <??> sprintf "word14be: failed at %i"
 
-    // Parse a word32 (big endian).
+    /// Parse a word32 (big endian).
     let readUInt32be =
       parseMidi {
         let! a = readByte
@@ -316,4 +354,13 @@ module ParserMonad =
         let! c = readByte
         let! d = readByte
         return (word32be a b c d)
+        }
+
+    /// Parse a word24 (big endian).
+    let readWord24be =
+        parseMidi {
+            let! a = readByte
+            let! b = readByte
+            let! c = readByte
+            return (word24be a b c)
         }

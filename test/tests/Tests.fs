@@ -2,14 +2,15 @@ module ZMidi.Tests
 open Expecto
 open ZMidi.Internal.ParserMonad
 open ZMidi.ReadFile
+open ZMidi.DataTypes
 
 let tests =
   test "parseVarlen" {
       let cases = 
         [|
-          //{| expected = 0x00000000u; input = [|0x00uy|] |}
-          //{| expected = 0x00000040u; input = [|0x40uy|] |}
-          //{| expected = 0x0000007fu; input = [|0x7fuy|] |}
+          {| expected = 0x00000000u; input = [|0x00uy|] |}
+          {| expected = 0x00000040u; input = [|0x40uy|] |}
+          {| expected = 0x0000007fu; input = [|0x7fuy|] |}
           {| expected = 0x00000080u; input = [|0x81uy; 0x00uy|] |}
           {| expected = 0x00002000u; input = [|0xc0uy; 0x00uy|] |}
           {| expected = 0x00003fffu; input = [|0xffuy; 0x7fuy|] |}
@@ -20,7 +21,6 @@ let tests =
           {| expected = 0x08000000u; input = [|0xc0uy; 0x80uy; 0x80uy; 0x00uy|] |}
           {| expected = 0x0fffffffu; input = [|0xffuy; 0xffuy; 0xffuy; 0x7fuy|] |}
         |]
-
 
       let state = State.initial
 

@@ -3,6 +3,7 @@
 type midiportnumber = byte
 type word8 = byte
 type word16 = uint16
+type word24 = uint32
 type word32 = uint32
 type bits7 = byte
 type midichannel = byte

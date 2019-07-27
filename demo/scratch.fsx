@@ -1,12 +1,15 @@
-#load "../src/zmidi/datatypes.fs"
-#load "../src/zmidi/extratypes.fs"
-#load "../src/zmidi/internal/utils.fs"
-#load "../src/zmidi/internal/parsermonad.fs"
-#load "../src/zmidi/read.fs"
-//#r "../build/Debug/AnyCPU/net45/zmidi-fs-core.dll"
+//#load "../src/zmidi/datatypes.fs"
+//#load "../src/zmidi/extratypes.fs"
+//#load "../src/zmidi/internal/utils.fs"
+//#load "../src/zmidi/internal/parsermonad.fs"
+//#load "../src/zmidi/read.fs"
+#r "../build/Debug/AnyCPU/net45/zmidi-fs-core.dll"
+
+
 open System.IO
 open ZMidi.Internal.ParserMonad
-(*
+open ZMidi
+
 let folder = 
   Path.Combine(__SOURCE_DIRECTORY__ , ".." , "data", "midifiles")
   |> DirectoryInfo
@@ -33,7 +36,7 @@ for file in folder.EnumerateFiles() do
     ()
   | Error something -> printfn "ERR: %s %A" file.FullName something
 
-  *)
+
 let cases = 
   [|
     {| expected = 0x00000000u; input = [|0x00uy|] |}
@@ -55,18 +58,50 @@ for case in cases do
   let result = runParser ZMidi.ReadFile.getVarlen case.input state
   printfn "%A" result
 
+do 
+  printfn "hello"; 
+  let a = 1; 
+  printfn "world %i" a;
+
+//do printfn "hello"; let a = 1; printfn "world %i" a;
+
+open ZMidi.ReadFile
+open ZMidi.DataTypes
+let p = parseMidi {
+  let! _ = assertString "MThd"
+  let! _ = assertWord32 6u
+  let! format = fileFormat
+  let! trackCount = readUInt16be
+  let! timeDiv = timeDivision
+  let header =
+         { trackCount = trackCount
+           timeDivision = timeDiv
+           format = format }
+         
+  let! _ = assertString "MTrk"
+  let! l = readUInt32be
+  let! t = deltaTime
+  let! e = event
+  return (l,t,e)
+  //let! track1 = track
+  //return track1
+}
+  
+  
+
+for file in folder.EnumerateFiles() do
+  let buffer = File.ReadAllBytes file.FullName
+
+  let parseResult = 
+    ZMidi.Internal.ParserMonad.runParser
+      p
+      buffer
+      State.initial
 
 
-let inline (|TestBit|_|) (bit: int) (i: ^T) =
-  let mask = LanguagePrimitives.GenericOne <<< bit
-  if mask &&& i = mask then Some () else None
+  printfn "%s" file.FullName 
 
-let inline clearBit (bit: int) (i: ^T) =
-  let mask = ~~~ (LanguagePrimitives.GenericOne <<< bit)
-  i &&& mask
-let inline msbHigh i =
-  match i with
-  | TestBit 7 -> true
-  | _ -> false
-
-msbHigh 0x80uy &&& 0x7fuy
+  match parseResult with 
+  | Ok result -> 
+    printfn "%A" result
+  | Error something -> printfn "ERR: %s %A" file.FullName something
