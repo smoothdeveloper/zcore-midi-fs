@@ -136,12 +136,15 @@ module ParserMonad =
     let inline mfor (items: #seq<'a>) (fn: 'a -> ParserMonad<'b>) : ParserMonad<seq<'b>> = failwithf ""
 
 
+    let (>>=) (m: ParserMonad<'a>) (k: 'a -> ParserMonad<'b>) : ParserMonad<'b> =
+      bindM m k
+   
     type ParserBuilder() = 
         member self.ReturnFrom (ma:ParserMonad<'a>) : ParserMonad<'a> = ma
         member self.Return x         = mreturn x
         member self.Bind (p,f)       = bindM p f
-        member self.Zero ()          = mzero ()
-        member self.Combine (ma, mb) = mplus ma mb
+        member self.Zero a          = ParserMonad (fun input state -> Ok(a, state))
+        //member self.Combine (ma, mb) = ma >>= mb
 
         // inspired from http://www.fssnip.net/7UJ/title/ResultBuilder-Computational-Expression
         // probably broken
@@ -149,15 +152,15 @@ module ParserMonad =
              try self.ReturnFrom(m)
              finally compensation()
         
-        member self.Delay(f: unit -> ParserMonad<'a>) : ParserMonad<'a> = delayM f
-        member self.Using(res:#System.IDisposable, body) =
-              self.TryFinally(body res, fun () -> match res with null -> () | disp -> disp.Dispose())
-        member self.While(guard, f) =
-               if not (guard()) then self.Zero() else
-               do f() |> ignore
-               self.While(guard, f)
-        member self.For(sequence:seq<_>, body) =
-               self.Using(sequence.GetEnumerator(), fun enum -> self.While(enum.MoveNext, fun () -> self.Delay(fun () -> body enum.Current)))
+        //member self.Delay(f: unit -> ParserMonad<'a>) : ParserMonad<'a> = f ()
+        //member self.Using(res:#System.IDisposable, body) =
+        //      self.TryFinally(body res, fun () -> if not (isNull res) then res.Dispose())
+        //member self.While(guard, f) =
+        //       if not (guard()) then self.Zero () else
+        //       do f() |> ignore
+        //       self.While(guard, f)
+        //member self.For(sequence:seq<_>, body) =
+        //       self.Using(sequence.GetEnumerator(), fun enum -> self.While(enum.MoveNext, fun () -> self.Delay(fun () -> body enum.Current)))
 
     let (parseMidi:ParserBuilder) = new ParserBuilder()
 
@@ -181,9 +184,6 @@ module ParserMonad =
             | Ok result -> Ok result
             | Error _ -> Error(mkOtherParseError st genMessage)
 
-    let (>>=) (m: ParserMonad<'a>) (k: 'a -> ParserMonad<'b>) : ParserMonad<'b> =
-      bindM m k
-   
     ///
     let fmap (f: 'a -> 'b) (p: ParserMonad<'a>) : ParserMonad<'b> =
       parseMidi {
@@ -284,12 +284,19 @@ module ParserMonad =
 
     /// Run a parser within a bounded section of the input stream.
     let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
+        
+        
+        let rec loop i (data: 'a array) =
+            parseMidi {
+                if i < n then
+                    let! r = p
+                    data.[int i] <- r 
+                    return! (loop (i + LanguagePrimitives.GenericOne) data)
+            }     
         parseMidi {
-            let l = Array.zeroCreate (int n) // can't use array expression inside a CE (at least as is)
-            for (i: 'T) in LanguagePrimitives.GenericZero<'T> .. (n - LanguagePrimitives.GenericOne<'T>) do
-              let! r = p
-              l.[int i] <- r
-            return l
+            let data = Array.zeroCreate (int n) // can't use array expression inside a CE (at least as is)
+            do! loop LanguagePrimitives.GenericZero data
+            return data            
         }
 
     /// Apply the parser for /count/ times, derive the final answer
