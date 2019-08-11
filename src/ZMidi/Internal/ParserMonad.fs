@@ -285,19 +285,25 @@ module ParserMonad =
     /// Run a parser within a bounded section of the input stream.
     let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
         
-        
-        let rec loop i (data: 'a array) =
-            parseMidi {
-                if i < n then
-                    let! r = p
-                    data.[int i] <- r 
-                    return! (loop (i + LanguagePrimitives.GenericOne) data)
-            }     
-        parseMidi {
-            let data = Array.zeroCreate (int n) // can't use array expression inside a CE (at least as is)
-            do! loop LanguagePrimitives.GenericZero data
-            return data            
-        }
+        ParserMonad(fun data state ->
+            let result = Array.zeroCreate (int n)
+            let mutable lastState = state
+            let errors = ResizeArray()
+            for i in LanguagePrimitives.GenericZero .. n do
+              match apply1 p data lastState with
+              | Ok (item,state) ->
+                  lastState <- state
+                  result.[int i] <- item
+              | Error e ->
+                  errors.Add (i, e)
+              
+            if Seq.isEmpty errors then
+                let message =
+                    errors |> Seq.map (sprintf "%A") |> String.concat System.Environment.NewLine
+                Error (ParseError(lastState.Position , ErrMsg.Other(message)))
+            else
+                Ok (result, lastState)
+            )
 
     /// Apply the parser for /count/ times, derive the final answer
     /// from the intermediate list with the supplied function.

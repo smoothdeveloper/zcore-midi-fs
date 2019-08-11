@@ -93,8 +93,6 @@ module ReadFile =
 
     let textEvent textType =
       parseMidi {
-        let! a = assertWord8 2uy
-        let! b = peek
         let! text = getVarlenText
         return TextEvent(textType, text)
       }
