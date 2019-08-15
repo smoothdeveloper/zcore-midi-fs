@@ -9,7 +9,7 @@ type bits7 = byte
 type midichannel = byte
 type [<Struct>] DeltaTime(value: word32) =
     member x.Value = value
-
+    override x.ToString() = sprintf "DeltaTime:%i" value
 type [<Struct>] word14(value: word16) =
     member x.Value = value
 
