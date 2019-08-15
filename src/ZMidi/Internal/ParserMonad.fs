@@ -182,7 +182,9 @@ module ParserMonad =
         ParserMonad <| fun input st -> 
             match apply1 parser input st with
             | Ok result -> Ok result
-            | Error _ -> Error(mkOtherParseError st genMessage)
+            | Error e ->
+                logf "oops <??>: e:%A" e
+                Error(mkOtherParseError st genMessage)
 
     ///
     let fmap (f: 'a -> 'b) (p: ParserMonad<'a>) : ParserMonad<'b> =
@@ -244,7 +246,7 @@ module ParserMonad =
                   | PositionValid -> f input state
                   | PositionInvalid -> Error (mkParseError state (EOF name))
                 with
-                | e -> Error (mkParseError state (Other (sprintf "%A" e)))
+                | e -> Error (mkParseError state (Other (sprintf "%s %A" name e)))
             )
 
     let peek : ParserMonad<byte> =
@@ -265,7 +267,7 @@ module ParserMonad =
     /// Repeats a given <see paramref="parser"/> <see paramref="length"/> times.
     /// Fails with accumulated errors when any encountered.
     let inline count (length : ^T) (parser : ParserMonad<'a>) : ParserMonad<'a []> =
-        ParserMonad <| fun input state -> 
+        ParserMonad <| fun input state ->
             let rec work (i : 'T) 
                          (st : State) 
                          (fk : ParseError -> Result<'a list * State, ParseError>) 
@@ -284,23 +286,24 @@ module ParserMonad =
 
     /// Run a parser within a bounded section of the input stream.
     let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
-        
         ParserMonad(fun data state ->
             let result = Array.zeroCreate (int n)
             let mutable lastState = state
-            let errors = ResizeArray()
-            for i in LanguagePrimitives.GenericZero .. n do
-              match apply1 p data lastState with
-              | Ok (item,state) ->
-                  lastState <- state
-                  result.[int i] <- item
-              | Error e ->
-                  errors.Add (i, e)
-              
-            if Seq.isEmpty errors then
-                let message =
-                    errors |> Seq.map (sprintf "%A") |> String.concat System.Environment.NewLine
-                Error (ParseError(lastState.Position , ErrMsg.Other(message)))
+// revisit with a fold?
+            let mutable error = Ok (Unchecked.defaultof<_>,lastState)
+            let mutable i = LanguagePrimitives.GenericZero
+            let mutable errorOccured = false
+            while i < n && not errorOccured do
+                i <- i + LanguagePrimitives.GenericOne
+                match apply1 p data lastState with
+                | Ok (item,state) ->
+                    lastState <- state
+                    result.[int i] <- item
+                | (Error e) ->
+                    error <- Error e
+                    errorOccured <- true
+            if errorOccured then
+                error
             else
                 Ok (result, lastState)
             )
@@ -310,6 +313,7 @@ module ParserMonad =
     let inline gencount (plen: ParserMonad<'T>) (p: ParserMonad<'a>) (constr: ^T -> 'a array -> 'answer) : ParserMonad<'answer> =
         parseMidi {
           let! l = plen
+          printfn "gen count: l: %i" l
           let! items = boundRepeat l p
           return constr l items
         }
