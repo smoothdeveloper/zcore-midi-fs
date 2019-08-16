@@ -1,14 +1,30 @@
+
+
 //#load "../src/zmidi/datatypes.fs"
 //#load "../src/zmidi/extratypes.fs"
 //#load "../src/zmidi/internal/utils.fs"
 //#load "../src/zmidi/internal/parsermonad.fs"
 //#load "../src/zmidi/read.fs"
 #r "../build/Debug/AnyCPU/net45/zmidi-fs-core.dll"
-
-
 open System.IO
 open ZMidi.Internal.ParserMonad
 open ZMidi
+//ZMidi.Internal.ParserMonad.debug <- true
+(*
+
+
+ 
+let pp = parseMidi {
+  return boundRepeat 10 readByte
+}
+
+
+let d = Seq.initInfinite (fun i -> byte (i % 255)) |> Seq.truncate 10 |> Seq.toArray 
+let s = State.initial
+
+let (Ok(ParserMonad f)) = (ZMidi.Internal.ParserMonad.runParser pp d s)
+f d s
+*)
 
 let folder = 
   Path.Combine(__SOURCE_DIRECTORY__ , ".." , "data", "midifiles")
@@ -16,6 +32,7 @@ let folder =
 
 for file in folder.EnumerateFiles() do
   let buffer = File.ReadAllBytes file.FullName
+  printfn "======================= %s" file.FullName 
 
   let parseResult = 
     ZMidi.Internal.ParserMonad.runParser
@@ -23,17 +40,13 @@ for file in folder.EnumerateFiles() do
       buffer
       State.initial
 
-
-  printfn "%s" file.FullName 
-
   match parseResult with 
   | Ok result -> 
     
     printfn "%i tracks" result.tracks.Length
     for t in result.tracks do
-      t.Length
-      printfn "track: %A" t
-    ()
+      printfn "track: %A events" t.Length
+    
   | Error something -> printfn "ERR: %s %A" file.FullName something
 
 
@@ -65,6 +78,39 @@ do
 
 //do printfn "hello"; let a = 1; printfn "world %i" a;
 
+
+
+
+
+
+
+
+let d = [|    0xffuy
+              0x08uy
+              0x0euy
+              0x41uy
+              0x6Duy
+              0x61uy
+              0x7Auy
+              0x69uy
+              0x6euy
+              0x67uy
+              0x20uy
+              0x47uy
+              0x72uy
+              0x61uy
+              0x63uy
+              0x65uy
+              0x00uy
+              |]
+
+let p = ZMidi.ReadFile.event 
+let s = State.initial
+
+let (Ok(ParserMonad f)) = (ZMidi.Internal.ParserMonad.runParser p d s)
+f d s
+
+
 open ZMidi.ReadFile
 open ZMidi.DataTypes
 let p = parseMidi {
@@ -78,14 +124,8 @@ let p = parseMidi {
            timeDivision = timeDiv
            format = format }
          
-  let! _ = assertString "MTrk"
-  let! l = readUInt32be
-  let! t = deltaTime
-  let! e = event
-  return (l,t,e)
-  //let! track1 = track
-  //return track1
-}
+  return! track
+}    
   
   
 
@@ -105,3 +145,13 @@ for file in folder.EnumerateFiles() do
   | Ok result -> 
     printfn "%A" result
   | Error something -> printfn "ERR: %s %A" file.FullName something
+
+
+
+let pp = parseMidi {
+  return boundRepeat 5 readByte
+}
+
+let (Ok(ParserMonad f)) = (ZMidi.Internal.ParserMonad.runParser pp [|1uy..5uy|] State.initial)
+
+f [|1uy..5uy|] State.initial

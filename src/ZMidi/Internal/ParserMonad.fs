@@ -290,6 +290,29 @@ module ParserMonad =
 
 
     /// Run a parser within a bounded section of the input stream.
+    let repeatTillPosition (maxPosition: Pos) (p: ParserMonad<'a>) : ParserMonad<'a array> =
+        ParserMonad(fun data state ->
+            let results = ResizeArray()
+            let mutable firstError = Ok (Array.empty, state) 
+            let mutable lastState = state
+            let rec loop () =
+                if lastState.Position < int maxPosition then
+                    match apply1 p data lastState with
+                    | Ok (result, state) ->
+                        lastState <- state
+                        results.Add result
+                        loop ()
+                    | Error e ->
+                        firstError <- Error e
+
+            loop ()
+            match firstError with
+            | Ok _ ->
+                Ok(results.ToArray(), lastState)
+            | Error _ ->
+                firstError
+        )
+                        
     let inline boundRepeat (n: ^T) (p: ParserMonad<'a>) : ParserMonad<'a array> =
         ParserMonad(fun data state ->
             let result = Array.zeroCreate (int n)
@@ -299,6 +322,7 @@ module ParserMonad =
             let mutable i = LanguagePrimitives.GenericZero
             let mutable errorOccured = false
             logf "bound repeat %i" n
+
             while i < n && not errorOccured do
                 logf "bound repeat %i/%i" i n
   
@@ -321,7 +345,7 @@ module ParserMonad =
     let inline gencount (plen: ParserMonad<'T>) (p: ParserMonad<'a>) (constr: ^T -> 'a array -> 'answer) : ParserMonad<'answer> =
         parseMidi {
           let! l = plen
-          printfn "gen count: l: %i" l
+          logf "gen count: l: %i" l
           let! items = boundRepeat l p
           return constr l items
         }

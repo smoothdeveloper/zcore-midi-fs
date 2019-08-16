@@ -428,7 +428,10 @@ event = peek >>= step
         }
     let messages i = 
       parseMidi {
-          return! boundRepeat (int i) message
+          
+          let! lastPos = getPos
+          let maxPos = lastPos + int i
+          return! repeatTillPosition maxPos message
       }
     let track : ParserMonad<MidiTrack> =
         parseMidi {
