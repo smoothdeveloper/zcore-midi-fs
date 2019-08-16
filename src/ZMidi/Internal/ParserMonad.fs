@@ -79,9 +79,14 @@ module ParserMonad =
     type ParserMonad<'a> = 
         ParserMonad of (MidiData -> State -> Result<'a * State, ParseError> )
 
-    let inline logf format =
+    let nullOut = new StreamWriter(Stream.Null) :> TextWriter
+    let mutable debug = false
+    let logf format = //format: Printf.TextWriterFormat<'a>) =
+          if debug then
+            printfn format
+          else
+            fprintfn nullOut format
         
-        printfn format
     let inline private apply1 (parser : ParserMonad<'a>) 
                        (midiData : byte[])
                        (state : State)  :  Result<'a * State, ParseError> = 
@@ -90,7 +95,7 @@ module ParserMonad =
             let result = fn midiData state
             match result with
             | Ok (r, state) ->
-              logf "parse ok: %50s %O" (sprintf "%A" r) state
+              logf "parse ok: %50s %O" (sprintf "%O" r) state
               #if DEBUG_LASTPARSE
               let state = { state with LastParse = r }
               #endif
@@ -293,8 +298,10 @@ module ParserMonad =
             let mutable error = Ok (Unchecked.defaultof<_>,lastState)
             let mutable i = LanguagePrimitives.GenericZero
             let mutable errorOccured = false
+            logf "bound repeat %i" n
             while i < n && not errorOccured do
-                i <- i + LanguagePrimitives.GenericOne
+                logf "bound repeat %i/%i" i n
+  
                 match apply1 p data lastState with
                 | Ok (item,state) ->
                     lastState <- state
@@ -302,6 +309,7 @@ module ParserMonad =
                 | (Error e) ->
                     error <- Error e
                     errorOccured <- true
+                i <- i + LanguagePrimitives.GenericOne
             if errorOccured then
                 error
             else

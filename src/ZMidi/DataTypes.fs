@@ -130,6 +130,7 @@ and MidiMessage = {
     timestamp: DeltaTime
     event: MidiEvent
 }
+with override x.ToString() = sprintf "{%A %A}" x.timestamp x.event
 
 and MidiTrack = MidiMessage array
 

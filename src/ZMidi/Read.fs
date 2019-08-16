@@ -53,14 +53,7 @@ module ReadFile =
         return (uint32 result) }
       
     let getVarlenText = gencount getVarlen readChar (fun _ b -> System.String b)
-    let getVarlenBytes =
-        parseMidi {
-          let! l = getVarlen
-          return! ParserMonad (
-                    fun data state ->
-                      Ok (data.[state.Position .. state.Position + (int l) - 1], { state with Position = state.Position + int l})
-                  )
-        }
+    let getVarlenBytes = gencount getVarlen readByte (fun _ b -> b)
         
     let deltaTime = 
       parseMidi {
