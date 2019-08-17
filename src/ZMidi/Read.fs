@@ -329,22 +329,25 @@ module ReadFile =
 
 
     let voiceEvent n =
-      match n with
-      | SB(0x80uy, ch) -> parseMidi { do! setRunningEvent (NoteOff ch)
-                                      return! noteOff ch }
-      | SB(0x90uy, ch) -> parseMidi { do! setRunningEvent (NoteOn ch)
-                                      return! noteOn ch }
-      | SB(0xa0uy, ch) -> parseMidi { do! setRunningEvent (NoteAftertoucuh ch)
-                                      return! noteAftertouch ch }
-      | SB(0xb0uy, ch) -> parseMidi { do! setRunningEvent (Control ch)
-                                      return! controller ch }
-      | SB(0xc0uy, ch) -> parseMidi { do! setRunningEvent (Program ch)
-                                      return! programChange ch }
-      | SB(0xd0uy, ch) -> parseMidi { do! setRunningEvent (ChannelAftertouch ch)
-                                      return! channelAftertouch ch }
-      | SB(0xe0uy, ch) -> parseMidi { do! setRunningEvent (PitchBend ch)
-                                      return! pitchBend ch }
-      | otherwise -> impossibleMatch (sprintf "voiceEvent: %x" otherwise)
+      parseMidi {
+        match n with
+        | SB(0x80uy, ch) -> do! setRunningEvent (NoteOff ch)
+                            return! noteOff ch
+        | SB(0x90uy, ch) -> do! setRunningEvent (NoteOn ch)
+                            return! noteOn ch
+        | SB(0xa0uy, ch) -> do! setRunningEvent (NoteAftertoucuh ch)
+                            return! noteAftertouch ch
+        | SB(0xb0uy, ch) -> do! setRunningEvent (Control ch)
+                            return! controller ch
+        | SB(0xc0uy, ch) -> do! setRunningEvent (Program ch)
+                            return! programChange ch
+        | SB(0xd0uy, ch) -> do! setRunningEvent (ChannelAftertouch ch)
+                            return! channelAftertouch ch
+        | SB(0xe0uy, ch) -> do! setRunningEvent (PitchBend ch)
+                            return! pitchBend ch
+        | otherwise      -> return! impossibleMatch (sprintf "voiceEvent: %x" otherwise)
+      }
+
     let runningStatus (event: VoiceEvent) : ParserMonad<MidiEvent> = 
       let mVoiceEvent e = mreturn (VoiceEvent(MidiRunningStatus.ON, e))
       match event with
@@ -384,40 +387,34 @@ event = peek >>= step
     /// can cause fatal parse errors.
     
     let event : ParserMonad<MidiEvent> = 
-      let step n : ParserMonad<MidiEvent> = 
-        parseMidi {
-          match n with
-          | 0xffuy -> 
-            do! dropByte
-            let! event = readByte >>= metaEvent
-            return MetaEvent event
-          | 0xf7uy -> 
-            do! dropByte
-            let! sysexEvent = sysExEscape
-            return SysExEvent sysexEvent
-          | 0xf0uy ->
-            do! dropByte
-            let! sysexEvent = sysExEvent
-            return SysExEvent sysexEvent
-          | x when x >= 0xf8uy ->
-            do! dropByte
-            let! event = sysRealtimeEvent x
-            return SysRealtimeEvent event
-          | x when x >= 0xf1uy ->
-            do! dropByte
-            let! event = sysCommonEvent x
-            return SysCommonEvent event
-          | x when x >= 0x80uy ->
-            do! dropByte
-            let! voiceEvent = voiceEvent x
-            return VoiceEvent(MidiRunningStatus.OFF, voiceEvent)
-          | otherwise ->
-            return! (getRunningEvent >>= runningStatus)
-
-        }
       parseMidi {
-        let! p = peek
-        return! step p 
+        match! peek with
+        | 0xffuy -> 
+          do! dropByte
+          let! event = readByte >>= metaEvent
+          return MetaEvent event
+        | 0xf7uy -> 
+          do! dropByte
+          let! sysexEvent = sysExEscape
+          return SysExEvent sysexEvent
+        | 0xf0uy ->
+          do! dropByte
+          let! sysexEvent = sysExEvent
+          return SysExEvent sysexEvent
+        | x when x >= 0xf8uy ->
+          do! dropByte
+          let! event = sysRealtimeEvent x
+          return SysRealtimeEvent event
+        | x when x >= 0xf1uy ->
+          do! dropByte
+          let! event = sysCommonEvent x
+          return SysCommonEvent event
+        | x when x >= 0x80uy ->
+          do! dropByte
+          let! voiceEvent = voiceEvent x
+          return VoiceEvent(MidiRunningStatus.OFF, voiceEvent)
+        | otherwise ->
+          return! (getRunningEvent >>= runningStatus)
       }
 
     let message = 

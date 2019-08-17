@@ -17,8 +17,17 @@ module ParserMonad =
         | Program           of byte
         | ChannelAftertouch of byte
         | PitchBend         of byte
+        override x.ToString() =
+          match x with
+          | StatusOff           -> "StatusOff"
+          | NoteOn            o -> "NoteOn "            + string o
+          | NoteOff           o -> "NoteOff "           + string o
+          | NoteAftertoucuh   o -> "NoteAftertoucuh "   + string o
+          | Control           o -> "Control "           + string o
+          | Program           o -> "Program "           + string o
+          | ChannelAftertouch o -> "ChannelAftertouch " + string o
+          | PitchBend         o -> "PitchBend "         + string o
 
-  
     type MidiData = byte array
 
     type Pos = int
@@ -48,7 +57,7 @@ module ParserMonad =
                 
                 (sprintf "%A" x.LastParse)
             #else
-            sprintf "(Pos:%i;Status:%30s)" x.Position (sprintf "%A" x.RunningStatus)
+            System.String.Format("(Pos:{0};Status:{1})", x.Position, string x.RunningStatus)
             #endif
     type ParseError = 
       ParseError of 
@@ -93,9 +102,12 @@ module ParserMonad =
         let (ParserMonad fn) = parser 
         try
             let result = fn midiData state
+            let oldState = state
             match result with
             | Ok (r, state) ->
-              logf "parse ok: %50s %O" (sprintf "%O" r) state
+              if debug then
+                if state <> oldState then
+                    logf "parse ok: %O" state
               #if DEBUG_LASTPARSE
               let state = { state with LastParse = r }
               #endif
@@ -145,15 +157,15 @@ module ParserMonad =
       bindM m k
    
     type ParserBuilder() = 
-        member self.ReturnFrom (ma:ParserMonad<'a>) : ParserMonad<'a> = ma
-        member self.Return x         = mreturn x
-        member self.Bind (p,f)       = bindM p f
-        member self.Zero a          = ParserMonad (fun input state -> Ok(a, state))
+        member inline self.ReturnFrom (ma:ParserMonad<'a>) : ParserMonad<'a> = ma
+        member inline self.Return x         = mreturn x
+        member inline self.Bind (p,f)       = bindM p f
+        member inline self.Zero a          = ParserMonad (fun input state -> Ok(a, state))
         //member self.Combine (ma, mb) = ma >>= mb
 
         // inspired from http://www.fssnip.net/7UJ/title/ResultBuilder-Computational-Expression
         // probably broken
-        member self.TryFinally(m, compensation) =
+        member inline self.TryFinally(m, compensation) =
              try self.ReturnFrom(m)
              finally compensation()
         
@@ -183,7 +195,7 @@ module ParserMonad =
         ParserMonad <| fun _ st -> Error (mkOtherParseError st genMessage)
 
     /// Run the parser, if it fails swap the error message.
-    let ( <??> ) (parser : ParserMonad<'a>) (genMessage : Pos -> string) : ParserMonad<'a> = 
+    let inline ( <??> ) (parser : ParserMonad<'a>) (genMessage : Pos -> string) : ParserMonad<'a> = 
         ParserMonad <| fun input st -> 
             match apply1 parser input st with
             | Ok result -> Ok result
@@ -231,7 +243,7 @@ module ParserMonad =
     let getRunningEvent : ParserMonad<VoiceEvent> = 
         ParserMonad <| fun _ st -> Ok (st.RunningStatus , st)
 
-    let setRunningEvent (runningStatus : VoiceEvent) : ParserMonad<unit> = 
+    let inline setRunningEvent (runningStatus : VoiceEvent) : ParserMonad<unit> = 
         ParserMonad <| fun _ st -> Ok ((),  { st with RunningStatus = runningStatus })
 
     let getPos : ParserMonad<int> =

@@ -5,7 +5,7 @@
 //#load "../src/zmidi/internal/utils.fs"
 //#load "../src/zmidi/internal/parsermonad.fs"
 //#load "../src/zmidi/read.fs"
-#r "../build/Debug/AnyCPU/net45/zmidi-fs-core.dll"
+#r "../build/Release/AnyCPU/net45/zmidi-fs-core.dll"
 open System.IO
 open ZMidi.Internal.ParserMonad
 open ZMidi
@@ -33,13 +33,13 @@ let folder =
 for file in folder.EnumerateFiles() do
   let buffer = File.ReadAllBytes file.FullName
   printfn "======================= %s" file.FullName 
-
+  let watch = System.Diagnostics.Stopwatch.StartNew()
   let parseResult = 
     ZMidi.Internal.ParserMonad.runParser
       ZMidi.ReadFile.midiFile
       buffer
       State.initial
-
+  printfn "ellapsed parse time : %A" watch.Elapsed
   match parseResult with 
   | Ok result -> 
     
@@ -49,7 +49,7 @@ for file in folder.EnumerateFiles() do
     
   | Error something -> printfn "ERR: %s %A" file.FullName something
 
-
+(*
 let cases = 
   [|
     {| expected = 0x00000000u; input = [|0x00uy|] |}
@@ -154,4 +154,4 @@ let pp = parseMidi {
 
 let (Ok(ParserMonad f)) = (ZMidi.Internal.ParserMonad.runParser pp [|1uy..5uy|] State.initial)
 
-f [|1uy..5uy|] State.initial
+f [|1uy..5uy|] State.initial*)
