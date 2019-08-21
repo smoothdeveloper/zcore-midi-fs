@@ -11,7 +11,9 @@
     <Compile Include="ExtraTypes.fs" />
     <Compile Include="Internal\Utils.fs" />
     <Compile Include="Internal\ParserMonad.fs" />
+    <Compile Include="Internal\WriterMonad.fs" />
     <Compile Include="Read.fs" />
+    <Compile Include="Write.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

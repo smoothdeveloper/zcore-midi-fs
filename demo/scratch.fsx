@@ -9,7 +9,7 @@
 open System.IO
 open ZMidi.Internal.ParserMonad
 open ZMidi
-//ZMidi.Internal.ParserMonad.debug <- true
+ZMidi.Internal.ParserMonad.debug <- true
 (*
 
 

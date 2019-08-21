@@ -1,4 +1,6 @@
 source https://www.nuget.org/api/v2
-
+framework: netcore3, net472
+generate_load_scripts: on
+nuget FSharpPlus
 nuget System.Memory
 nuget Expecto.FsCheck

@@ -7,6 +7,9 @@ type word24 = uint32
 type word32 = uint32
 type bits7 = byte
 type midichannel = byte
+type midinote = byte
+type midivelocity = byte
+
 type [<Struct>] DeltaTime(value: word32) =
     member x.Value = value
     override x.ToString() = sprintf "DeltaTime:%i" value
@@ -57,7 +60,6 @@ type MidiEvent =
     | SysCommonEvent of MidiSysCommonEvent
     | SysRealtimeEvent of MidiSysRealtimeEvent
     | MetaEvent of MidiMetaEvent
-
 and MidiVoiceEvent =
     /// Note off.
     /// 
@@ -113,7 +115,16 @@ and MidiVoiceEvent =
     /// NOTE - as of v0.9.0 the value is interpreted.
     /// This is a Word14 value, the range is (0..16383).
     | PitchBend of status: bits7 * bend: word14
-
+    member x.Status =
+        match x with
+        | PitchBend(status,_)
+        | ChannelAftertouch(status,_)
+        | Controller(status,_,_)
+        | NoteAfterTouch(status,_,_)
+        | NoteOff(status,_,_)
+        | NoteOn(status,_,_)
+        | ProgramChange(status,_)
+         -> status
 
 and MidiTextType =
     | GenericText
@@ -320,7 +331,16 @@ and MidiSysCommonEvent =
     /// > F7
     /// 
     | EOX
-
+    member x.Status =
+        match x with
+        | QuarterFrame _   -> 0xf1uy
+        | SongPosPointer _ -> 0xf2uy
+        | SongSelect _     -> 0xf3uy
+        | UndefinedF4      -> 0xf4uy
+        | UndefinedF5      -> 0xf5uy
+        | TuneRequest      -> 0xf6uy
+        | EOX              -> 0xf7uy
+        
 /// System real-time event.
 ///
 /// These events may not be pertinent to MIDI files generated on a 
@@ -383,7 +403,15 @@ and MidiSysRealtimeEvent =
     /// > FF
     ///
     | SystemReset
-
-
+    member x.Status =
+        match x with
+        | TimingClock      -> 0xf8uy
+        | UndefinedF9      -> 0xf9uy
+        | StartSequence    -> 0xfauy
+        | ContinueSequence -> 0xfbuy
+        | StopSequence     -> 0xfcuy
+        | UndefinedFD      -> 0xfduy
+        | ActiveSensing    -> 0xfeuy
+        | SystemReset      -> 0xffuy 
 
 and [<RequireQualifiedAccess>] MidiScaleType = Major | Minor | OtherScale of word8

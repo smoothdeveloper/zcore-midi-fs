@@ -90,11 +90,12 @@ module ParserMonad =
 
     let nullOut = new StreamWriter(Stream.Null) :> TextWriter
     let mutable debug = false
-    let logf format = //format: Printf.TextWriterFormat<'a>) =
+    let logf format =
           if debug then
             printfn format
           else
             fprintfn nullOut format
+            //Unchecked.defaultof<_>
         
     let inline private apply1 (parser : ParserMonad<'a>) 
                        (midiData : byte[])
@@ -388,7 +389,7 @@ module ParserMonad =
             return (System.String arr)
         }
         <??> sprintf "readString failed at %i"
-
+    open ZMidi.Internal.DataTypes.FromBytes
     /// Parse a uint16 (big endian).
     let readUInt16be : ParserMonad<uint16>= 
         parseMidi { 

@@ -5,7 +5,7 @@ open ZMidi.DataTypes
 module ReadFile =
     open ZMidi.Internal.ParserMonad
     open ZMidi.Internal.Utils
-    open ZMidi.Internal.ExtraTypes
+    open ZMidi.Internal.DataTypes.FromBytes
 
     /// Apply parse then apply the check, if the check fails report
     /// the error message. 
@@ -17,18 +17,6 @@ module ReadFile =
         else 
           return! fatalError errorMessage
       }
-
-    let inline (|TestBit|_|) (bit: int) (i: ^T) =
-      let mask = LanguagePrimitives.GenericOne <<< bit
-      if mask &&& i = mask then Some () else None
-
-    let inline clearBit (bit: int) (i: ^T) =
-      let mask = ~~~ (LanguagePrimitives.GenericOne <<< bit)
-      i &&& mask
-    let inline msbHigh i =
-      match i with
-      | TestBit 7 -> true
-      | _ -> false
     let assertString (s: string) =
       postCheck (readString s.Length) ((=) s) (Other (sprintf "assertString: expected '%s'" s))
 
@@ -191,32 +179,6 @@ module ReadFile =
         | other  -> let! bytes = getVarlenBytes <??> (konst (sprintf "meta other %x" other))
                     return MetaOther(other, bytes)
       }
-//    let (<*>) af ma =
-
-
-    //let metaEvent n = //: ParserMonad<MetaEvent> =
-    //  match n with
-    //  ///| 0x00uy -> ( SequenceNumber <~> (assertWord8 2uy *> word16be)) <??> (sprintf "sequence number: failed at %i" )
-    //  | 0x01uy -> (textEvent GenericText)     <??> (sprintf "generic text: failed at %i")
-    //  | 0x02uy -> (textEvent CopyrightNotice) <??> (sprintf "generic text: failed at %i")
-    //  | 0x03uy -> (textEvent SequenceName)    <??> (sprintf "generic text: failed at %i")
-    //  | 0x04uy -> (textEvent InstrumentName)  <??> (sprintf "generic text: failed at %i")
-    //  | 0x05uy -> (textEvent Lyrics)          <??> (sprintf "generic text: failed at %i")
-    //  | 0x06uy -> (textEvent Marker)          <??> (sprintf "generic text: failed at %i")
-    //  | 0x07uy -> (textEvent CuePoint)        <??> (sprintf "generic text: failed at %i")
-    //  //| 0x20uy -> (textEvent GenericText)     <??> (sprintf "generic text: failed at %i")
-    //  | _ -> failwithf "metaEvent %i" n
-
-      //parseMidi {
-      //  
-      //}
-
-//sysExContPackets = 
-//  deltaTime >>= \dt -> getVarlenBytes (,) >>= \(n,xs) -> 
-//  let ans1 = MidiSysExContPacket dt n xs
-//  in if isTerminated xs then return [ans1]
-//                        else sysExContPackets >>= \ks -> 
-//                             return $ ans1:ks
 
     let isTerminated bytes =
       bytes 
@@ -331,7 +293,7 @@ module ReadFile =
     let voiceEvent n =
       parseMidi {
         match n with
-        | SB(0x80uy, ch) -> do! setRunningEvent (NoteOff ch)
+        | SB(0x80uy, ch) -> do! setRunningEvent (NoteOff ch); 
                             return! noteOff ch
         | SB(0x90uy, ch) -> do! setRunningEvent (NoteOn ch)
                             return! noteOn ch
@@ -359,25 +321,6 @@ module ReadFile =
       | ChannelAftertouch ch -> (channelAftertouch ch) >>= mVoiceEvent
       | PitchBend         ch -> (pitchBend ch)         >>= mVoiceEvent
       | StatusOff            -> readByte >>= (MidiEventOther >> mreturn)
-      //parseMidi {
-      //
-      //  //return MidiRunningStatus.ON
-      //}
-      
-      (*
-event :: ParserM MidiEvent
-event = peek >>= step
-  where
-    -- 00..7f  -- /data/
-    step n
-      | n == 0xFF  = MetaEvent         <$> (dropW8 *> (word8 >>= metaEvent))
-      | n >= 0xF8  = SysRealTimeEvent  <$> (dropW8 *> sysRealTimeEvent n)
-      | n == 0xF7  = SysExEvent        <$> (dropW8 *> sysExEscape)
-      | n >= 0xF1  = SysCommonEvent    <$> (dropW8 *> sysCommonEvent n)
-      | n == 0xF0  = SysExEvent        <$> (dropW8 *> sysExEvent)
-      | n >= 0x80  = VoiceEvent RS_OFF <$> (dropW8 *> voiceEvent (splitByte n))
-      | otherwise  = getRunningEvent >>= runningStatus
-      *)
 
     /// Parse an event - for valid input this function should parse
     /// without error (i.e all cases of event types are fully 
