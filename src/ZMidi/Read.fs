@@ -1,5 +1,6 @@
 namespace ZMidi
 
+open FSharpPlus
 open ZMidi.DataTypes
 
 module ReadFile =
