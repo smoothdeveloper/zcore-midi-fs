@@ -21,4 +21,8 @@
     <Compile Include="Write.fs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="FSharpPlus" Version="1.1.0-RC2" />
+  </ItemGroup>
+
 </Project>
