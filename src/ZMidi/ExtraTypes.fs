@@ -1,5 +1,5 @@
 ﻿module ZMidi.Internal.ExtraTypes
-open ZMidi.DataTypes
+open FSharpPlus.Math.Generic
 
 
 
@@ -31,8 +31,8 @@ let fromVarlen =
 let inline encodeVarlen (myValue) =
     let inline initMask nBits =
         [|0 .. nBits - 1|]
-        |> Array.map (fun shift -> LanguagePrimitives.GenericOne <<< shift)
-        |> Array.fold ((|||)) LanguagePrimitives.GenericZero
+        |> Array.map (fun shift -> 1G <<< shift)
+        |> Array.fold ((|||)) 0G
     let nBits = 7
     let maxBits =
         let nMaxBytes = System.Runtime.InteropServices.Marshal.SizeOf(myValue.GetType())
@@ -50,7 +50,7 @@ let inline encodeVarlen (myValue) =
         
     shiftAnd7Bits
     |> Array.rev
-    |> Array.skipWhile ((=) LanguagePrimitives.GenericZero)
-    |> function | [||] -> [|LanguagePrimitives.GenericZero|]
+    |> Array.skipWhile ((=) 0G)
+    |> function | [||] -> [|0G|]
                 | bytes -> bytes 
 

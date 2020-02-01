@@ -6,7 +6,6 @@ module ParserMonad =
     open System.IO
     open FSharpPlus
     open FSharpPlus.Data
-    open ZMidi.Internal.Utils
 
     /// Status is either OFF or the previous VoiceEvent * Channel.
     type VoiceEvent = 
@@ -130,15 +129,7 @@ module ParserMonad =
                                 )
                   )
             
-    let inline mreturn (x:'a) : ParserMonad<'a> = 
-        StateT <| fun st -> Ok (x, st)
-
-    let inline private bindM (parser : ParserMonad<'a>) 
-                      (next : 'a -> ParserMonad<'b>) : ParserMonad<'b> = 
-        StateT <| fun state -> 
-            match apply1 parser state with
-            | Error msg -> Error msg
-            | Ok (ans, st1) -> apply1 (next ans) st1
+    let inline mreturn (x:'a) : ParserMonad<'a> = result x
 
     let mzero () : ParserMonad<'a> = 
         StateT <| fun state -> Error (mkParseError state (EOF "mzero"))
@@ -149,14 +140,7 @@ module ParserMonad =
             | Error _ -> apply1 parser2 state
             | Ok res -> Ok res
 
-    let inline private delayM (fn:unit -> ParserMonad<'a>) : ParserMonad<'a> = 
-        bindM (mreturn ()) fn 
-
     let inline mfor (items: #seq<'a>) (fn: 'a -> ParserMonad<'b>) : ParserMonad<seq<'b>> = failwithf ""
-
-
-    let (>>=) (m: ParserMonad<'a>) (k: 'a -> ParserMonad<'b>) : ParserMonad<'b> =
-      bindM m k
    
     let parseMidi = monad
 
@@ -193,17 +177,8 @@ module ParserMonad =
                 Error(mkOtherParseError st genMessage)
 
     ///
-    let fmap (f: 'a -> 'b) (p: ParserMonad<'a>) : ParserMonad<'b> =
-      parseMidi {
-        let! a = p
-        return (f a)
-      }
+    let fmap (f: 'a -> 'b) (p: ParserMonad<'a>) : ParserMonad<'b> = map f p
     let inline ( <~> (* <$> *) ) (a) b = fmap a b
-    let ( *> ) (a: ParserMonad<'a>) (b: 'a -> ParserMonad<'b>) : ParserMonad<'b> = 
-      parseMidi {
-        let! a = a
-        return! (b a)
-      }
 
     // http://hackage.haskell.org/package/base-4.12.0.0/docs/src/GHC.Base.html#%3C%24
     /// Replace all locations in the input with the same value.
