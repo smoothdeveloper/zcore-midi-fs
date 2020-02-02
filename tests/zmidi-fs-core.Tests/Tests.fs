@@ -1,4 +1,5 @@
 module ZMidi.Tests
+open System.IO
 open Expecto
 open ZMidi.Internal.ParserMonad
 open ZMidi.ReadFile
@@ -6,6 +7,32 @@ open ZMidi.DataTypes
 
 [<Tests>]
 let tests =
+  testList "unit" [
+
+  test "parse all files" {
+      let dir = DirectoryInfo(Path.Combine(__SOURCE_DIRECTORY__, "..", "..", "data"))
+      let files = 
+          [|
+              yield! dir.GetFiles("*.midi", SearchOption.AllDirectories)
+              yield! dir.GetFiles("*.mid", SearchOption.AllDirectories)
+          |]
+      let okFiles, errorFiles =
+        [|
+          for f in files do
+            let bytes = File.ReadAllBytes f.FullName
+            f,runParser
+                midiFile
+                bytes
+                State.initial
+        |]
+        |> Array.partition (function (_,Ok _) -> true | (_,Error _) -> false)
+      printfn "%i files OK, %i files not OK" okFiles.Length errorFiles.Length
+      for f, error in errorFiles do
+          printfn "file %s had error: %A" f.FullName error
+      if errorFiles.Length > 0 then
+        failtest "failed files present"
+  }
+
   test "parseVarlen" {
       let cases = 
         [|
@@ -54,6 +81,7 @@ let tests =
         failwithf "%s" message
   }
 
+  ]
 
 [<EntryPoint>]
 let main args =
