@@ -4,7 +4,8 @@ namespace ZMidi.Internal
 module ParserMonad = 
 
     open System.IO
-
+    open FSharpPlus
+    open FSharpPlus.Data
     open ZMidi.Internal.Utils
 
     /// Status is either OFF or the previous VoiceEvent * Channel.
@@ -85,8 +86,7 @@ module ParserMonad =
         #endif
       )
 
-    type ParserMonad<'a> = 
-        ParserMonad of (MidiData -> State -> Result<'a * State, ParseError> )
+    type ParserMonad<'a> = ReaderT<MidiData,StateT<State,Result<'a * State, ParseError>>>
 
     let nullOut = new StreamWriter(Stream.Null) :> TextWriter
     let mutable debug = false
@@ -100,7 +100,7 @@ module ParserMonad =
     let inline private apply1 (parser : ParserMonad<'a>) 
                        (midiData : byte[])
                        (state : State)  :  Result<'a * State, ParseError> = 
-        let (ParserMonad fn) = parser 
+        let fn = ReaderT.run parser >> StateT.run
         try
             let result = fn midiData state
             let oldState = state
@@ -129,8 +129,9 @@ module ParserMonad =
                                 )
                   )
             
+    let ParserMonad f = ReaderT (fun r -> StateT (fun s -> f r s))
     let inline mreturn (x:'a) : ParserMonad<'a> = 
-        ParserMonad <| fun _ st -> Ok (x, st)
+        ReaderT <| fun _ -> StateT (fun st -> Ok (x, st))
 
     let inline private bindM (parser : ParserMonad<'a>) 
                       (next : 'a -> ParserMonad<'b>) : ParserMonad<'b> = 
@@ -156,31 +157,8 @@ module ParserMonad =
 
     let (>>=) (m: ParserMonad<'a>) (k: 'a -> ParserMonad<'b>) : ParserMonad<'b> =
       bindM m k
-   
-    type ParserBuilder() = 
-        member inline self.ReturnFrom (ma:ParserMonad<'a>) : ParserMonad<'a> = ma
-        member inline self.Return x         = mreturn x
-        member inline self.Bind (p,f)       = bindM p f
-        member inline self.Zero a          = ParserMonad (fun input state -> Ok(a, state))
-        //member self.Combine (ma, mb) = ma >>= mb
 
-        // inspired from http://www.fssnip.net/7UJ/title/ResultBuilder-Computational-Expression
-        // probably broken
-        member inline self.TryFinally(m, compensation) =
-             try self.ReturnFrom(m)
-             finally compensation()
-        
-        //member self.Delay(f: unit -> ParserMonad<'a>) : ParserMonad<'a> = f ()
-        //member self.Using(res:#System.IDisposable, body) =
-        //      self.TryFinally(body res, fun () -> if not (isNull res) then res.Dispose())
-        //member self.While(guard, f) =
-        //       if not (guard()) then self.Zero () else
-        //       do f() |> ignore
-        //       self.While(guard, f)
-        //member self.For(sequence:seq<_>, body) =
-        //       self.Using(sequence.GetEnumerator(), fun enum -> self.While(enum.MoveNext, fun () -> self.Delay(fun () -> body enum.Current)))
-
-    let (parseMidi:ParserBuilder) = new ParserBuilder()
+    let parseMidi = monad
 
     let runParser (ma:ParserMonad<'a>) input initialState =
       apply1 ma input initialState
@@ -385,7 +363,7 @@ module ParserMonad =
         <??> sprintf "word14be: failed at %i"
 
     /// Parse a word32 (big endian).
-    let readUInt32be =
+    let readUInt32be : ParserMonad<_> =
       parseMidi {
         let! a = readByte
         let! b = readByte
@@ -395,7 +373,7 @@ module ParserMonad =
         }
 
     /// Parse a word24 (big endian).
-    let readWord24be =
+    let readWord24be : ParserMonad<_> =
         parseMidi {
             let! a = readByte
             let! b = readByte
