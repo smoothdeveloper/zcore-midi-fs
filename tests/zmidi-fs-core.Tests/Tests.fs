@@ -4,6 +4,17 @@ open Expecto
 open ZMidi.Internal.ParserMonad
 open ZMidi.ReadFile
 open ZMidi.DataTypes
+open System.Net
+open System.IO.Compression
+
+let downloadFileSet (directory: DirectoryInfo) =
+    directory.Create()
+    let archive = Path.Combine(directory.FullName, "maestro-v2.0.0-midi.zip")
+    let client = new WebClient()
+    
+    client.DownloadFile(@"https://storage.googleapis.com/magentadata/datasets/maestro/v2.0.0/maestro-v2.0.0-midi.zip", archive)
+    ZipFile.ExtractToDirectory(archive, Path.Combine(directory.FullName, "maestro-v2.0.0-midi"))
+    File.Delete archive
 
 [<Tests>]
 let tests =
@@ -11,6 +22,8 @@ let tests =
 
   test "parse all files" {
       let dir = DirectoryInfo(Path.Combine(__SOURCE_DIRECTORY__, "..", "..", "data"))
+      if not dir.Exists then
+        downloadFileSet dir
       let files = 
           [|
               yield! dir.GetFiles("*.midi", SearchOption.AllDirectories)
