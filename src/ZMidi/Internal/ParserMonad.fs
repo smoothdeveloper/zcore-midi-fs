@@ -6,6 +6,7 @@ module ParserMonad =
     open System.IO
     open FSharpPlus
     open FSharpPlus.Data
+    open FSharpPlus.Math.Generic
 
     /// Status is either OFF or the previous VoiceEvent * Channel.
     type VoiceEvent = 
@@ -68,6 +69,8 @@ module ParserMonad =
         #if DEBUG_LASTPARSE
         * lastToken : obj // need top level type, picking System.Object for now
         #endif
+    with
+      static member (+) (_: ParseError, y: ParseError) = y
 
     let inline mkOtherParseError st (genMessage : Pos -> string) =
       ParseError(
@@ -134,11 +137,7 @@ module ParserMonad =
     let mzero () : ParserMonad<'a> = 
         StateT <| fun state -> Error (mkParseError state (EOF "mzero"))
 
-    let inline mplus (parser1 : ParserMonad<'a>) (parser2 : ParserMonad<'a>) : ParserMonad<'a> = 
-        StateT <| fun state -> 
-            match apply1 parser1 state with
-            | Error _ -> apply1 parser2 state
-            | Ok res -> Ok res
+    let inline mplus (parser1 : ParserMonad<'a>) (parser2 : ParserMonad<'a>) : ParserMonad<'a> = parser1 <|> parser2
 
     let inline mfor (items: #seq<'a>) (fn: 'a -> ParserMonad<'b>) : ParserMonad<seq<'b>> = failwithf ""
    
@@ -253,13 +252,13 @@ module ParserMonad =
                          (st : State) 
                          (fk : ParseError -> Result<'a list * State, ParseError>) 
                          (sk : State -> 'a list  -> Result<'a list * State, ParseError>) = 
-                if i <= LanguagePrimitives.GenericZero then 
+                if i <= 0G then 
                     sk st []
                 else 
                     match apply1 parser st with
                     | Error msg -> fk msg
                     | Ok (a1, st1) -> 
-                        work (i -  LanguagePrimitives.GenericOne) st1 fk (fun st2 ac -> 
+                        work (i - 1G) st1 fk (fun st2 ac -> 
                         sk st2 (a1 :: ac))
             work length state (fun msg -> Error msg) (fun st ac -> Ok (ac, st)) 
                 |> Result.map (fun (ans, st) -> (List.toArray ans, st))
