@@ -167,13 +167,8 @@ module ParserMonad =
        fmapM modify parser
 
     /// Run the parser, if it fails swap the error message.
-    let inline ( <??> ) (parser : ParserMonad<'a>) (genMessage : Pos -> string) : ParserMonad<'a> = 
-        StateT <| fun st -> 
-            match apply1 parser st with
-            | Ok result -> Ok result
-            | Error e ->
-                logf "oops <??>: e:%A" e
-                Error(mkOtherParseError st genMessage)
+    let inline ( <??> ) (parser : ParserMonad<'a>) (genMessage : Pos -> string) : ParserMonad<'a> =
+        parser </catch/> fun (ParseError (pos, _)) -> throw <| ParseError (pos, Other (genMessage pos))
 
     ///
     let fmap (f: 'a -> 'b) (p: ParserMonad<'a>) : ParserMonad<'b> = map f p
