@@ -186,7 +186,7 @@ module ReadFile =
       |> function | Some i -> true
                   | None -> false
 
-    let rec sysExContPackets =
+    let rec sysExContPackets : ParserMonad<_> =
       parseMidi {
         let! d = deltaTime
         let! b = getVarlenBytes
