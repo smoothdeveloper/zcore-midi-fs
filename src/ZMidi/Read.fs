@@ -1,5 +1,6 @@
 namespace ZMidi
 
+open FSharpPlus
 open ZMidi.DataTypes
 
 module ReadFile =
@@ -156,7 +157,6 @@ module ReadFile =
       }
       
     let metaEvent i =
-      let konst k _ = k
       parseMidi {
         match i with
         | 0x00uy -> return! metaEventSequenceNumber    <??> (konst "sequence number")

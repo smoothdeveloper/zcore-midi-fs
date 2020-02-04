@@ -3,19 +3,17 @@ open ZMidi.DataTypes
 open ZMidi.Internal.Utils
 open ZMidi.Internal.WriterMonad
 open System.Text
+open FSharpPlus
+
 module WriteFile =
     module PutOps =
         
-        let putAscii (text: string) = text |> Encoding.ASCII.GetBytes |> PutBytes
+        let putAscii (text: string) = String.getBytes Encoding.ASCII text |> PutBytes
         
-        let putWord32be (value: uint32) = PutBytes [| byte (value >>> 24)
-                                                      byte (value >>> 16)
-                                                      byte (value >>> 8)
-                                                      byte (value >>> 0) |]
+        let putWord32be (value: uint32) = PutBytes (toBytesBE value)
         
         
-        let putWord16be (value: uint16) = PutBytes [| byte (value >>> 8)
-                                                      byte (value >>> 0) |]
+        let putWord16be (value: uint16) = PutBytes (toBytesBE value)
         
         let putFormat = putWord16be << function | MidiFormat0 -> 0us
                                                 | MidiFormat1 -> 1us

@@ -1,8 +1,7 @@
 ﻿namespace ZMidi.Internal
 open ZMidi.DataTypes
+open FSharpPlus
 
-module Evil =
-    let inline uncurry4 f = fun (a,b,c,d) -> f a b c d
 module DataTypes =
     module FromBytes =
 
@@ -39,21 +38,21 @@ module DataTypes =
         module Iso =
             let reverse iso = snd iso, fst iso
             
-        let word32be : Iso<_,_> = (ToBytes.word32be), (Evil.uncurry4 FromBytes.word32be)
+        let word32be : Iso<_,_> = (ToBytes.word32be), (uncurryN FromBytes.word32be)
         
 module Utils = 
-    open System.IO
+    open FSharpPlus.Math.Generic
 
     let inline (|TestBit|_|) (bit: int) (i: ^T) =
-      let mask = LanguagePrimitives.GenericOne <<< bit
+      let mask = 1G <<< bit
       if mask &&& i = mask then Some () else None
 
     let inline clearBit (bit: int) (i: ^T) =
-      let mask = ~~~ (LanguagePrimitives.GenericOne <<< bit)
+      let mask = ~~~ (1G <<< bit)
       i &&& mask
       
     let inline setBit (bit: int) (i: ^T) =
-      let mask = (LanguagePrimitives.GenericOne <<< bit)
+      let mask = (1G <<< bit)
       i ||| mask
     let inline msbHigh i =
       match i with
@@ -86,8 +85,8 @@ module Utils =
             [|0 .. (maxSize - 1)|]
             |> Array.rev
             |> Array.map (fun shift ->
-                let mask = LanguagePrimitives.GenericOne <<< shift
-                if (number &&& mask <> LanguagePrimitives.GenericZero) then "■" else " "
+                let mask = 1G <<< shift
+                if (number &&& mask <> 0G) then "■" else " "
                 )
             |> String.concat ""
             |> sprintf "[%s]"
