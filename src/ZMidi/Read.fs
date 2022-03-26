@@ -27,17 +27,21 @@ module ReadFile =
       postCheck readByte ((=) i) (Other (sprintf "assertWord8: expected '%i'" i))
 
     let getVarlen : ParserMonad<word32> =
-      let rec loop acc =
+      let rec loop acc n =
         parseMidi {
           let! b = readByte
           let acc = acc <<< 7
           if msbHigh b then
             let result = uint64 (b &&& 0b01111111uy)
-            return! loop (acc + result)
+            if n > 4 then
+              failwithf $"starigg oibaeboiaeboit muchhh !! {acc}"
+              return! loop (acc + result) (n+1)
+            else
+              return! loop (acc + result) (n+1)
           else
             return (acc + (uint64 b)) }  
       parseMidi {
-        let! result = loop 0UL
+        let! result = loop 0UL 0
         return (uint32 result) }
       
     let getVarlenText = gencount getVarlen readChar (fun _ b -> System.String b)
@@ -293,7 +297,7 @@ module ReadFile =
     let voiceEvent n =
       parseMidi {
         match n with
-        | SB(0x80uy, ch) -> do! setRunningEvent (NoteOff ch); 
+        | SB(0x80uy, ch) -> do! setRunningEvent (NoteOff ch)
                             return! noteOff ch
         | SB(0x90uy, ch) -> do! setRunningEvent (NoteOn ch)
                             return! noteOn ch
@@ -310,6 +314,7 @@ module ReadFile =
         | otherwise      -> return! impossibleMatch (sprintf "voiceEvent: %x" otherwise)
       }
 
+    
     let runningStatus (event: VoiceEvent) : ParserMonad<MidiEvent> = 
       let mVoiceEvent e = mreturn (VoiceEvent(MidiRunningStatus.ON, e))
       match event with

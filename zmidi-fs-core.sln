@@ -13,6 +13,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "project", "project", "{BF60
 		RELEASE_NOTES.md = RELEASE_NOTES.md
 	EndProjectSection
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "zmidi-fs-core.Benchmarks", "tests\zmidi-fs-core.Benchmarks\zmidi-fs-core.Benchmarks.fsproj", "{24D6A18D-51F0-432B-A50F-30DC6B9C2DFB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{83EB1EBD-A942-4A7D-85CF-831309871506}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{83EB1EBD-A942-4A7D-85CF-831309871506}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{83EB1EBD-A942-4A7D-85CF-831309871506}.Release|Any CPU.Build.0 = Release|Any CPU
+		{24D6A18D-51F0-432B-A50F-30DC6B9C2DFB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{24D6A18D-51F0-432B-A50F-30DC6B9C2DFB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{24D6A18D-51F0-432B-A50F-30DC6B9C2DFB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{24D6A18D-51F0-432B-A50F-30DC6B9C2DFB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

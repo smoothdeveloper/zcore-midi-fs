@@ -1,6 +1,8 @@
 ﻿
 namespace ZMidi.Internal
 
+open System.Diagnostics
+
 module ParserMonad = 
 
     open System.IO
@@ -43,12 +45,18 @@ module ParserMonad =
           #if DEBUG_LASTPARSE
           LastParse : obj
           #endif
+          #if DEBUG_STOPWATCH
+          stopwatch: Stopwatch
+          #endif
         }
         static member initial =
             { Position = 0
               RunningStatus = VoiceEvent.StatusOff
               #if DEBUG_LASTPARSE
               LastParse = null
+              #endif
+              #if DEBUG_STOPWATCH
+              stopwatch = Stopwatch()
               #endif
             }
         override x.ToString () =
@@ -87,7 +95,13 @@ module ParserMonad =
 
     type ParserMonad<'a> = 
         ParserMonad of (MidiData -> State -> Result<'a * State, ParseError> )
-
+    type InlineIfLambdaAttribute() =
+        inherit System.Attribute()
+(*
+    type ParserMonad<'a> = (MidiData -> State -> Result<'a * State, ParseError> )
+    let inline ParserMonad fn = id fn
+    let inline (|ParserMonad|) fn = fn
+*)    
     let nullOut = new StreamWriter(Stream.Null) :> TextWriter
     let mutable debug = false
     let logf format =
@@ -97,7 +111,7 @@ module ParserMonad =
             fprintfn nullOut format
             //Unchecked.defaultof<_>
         
-    let inline private apply1 (parser : ParserMonad<'a>) 
+    let inline private apply1 ([<InlineIfLambda>]parser : ParserMonad<'a>) 
                        (midiData : byte[])
                        (state : State)  :  Result<'a * State, ParseError> = 
         let (ParserMonad fn) = parser 
@@ -132,7 +146,7 @@ module ParserMonad =
     let inline mreturn (x:'a) : ParserMonad<'a> = 
         ParserMonad <| fun _ st -> Ok (x, st)
 
-    let inline private bindM (parser : ParserMonad<'a>) 
+    let inline private bindM ([<InlineIfLambda>]parser : ParserMonad<'a>) 
                       (next : 'a -> ParserMonad<'b>) : ParserMonad<'b> = 
         ParserMonad <| fun input state -> 
             match apply1 parser input state with
@@ -142,7 +156,7 @@ module ParserMonad =
     let mzero () : ParserMonad<'a> = 
         ParserMonad <| fun _ state -> Error (mkParseError state (EOF "mzero"))
 
-    let inline mplus (parser1 : ParserMonad<'a>) (parser2 : ParserMonad<'a>) : ParserMonad<'a> = 
+    let inline mplus ([<InlineIfLambda>]parser1 : ParserMonad<'a>) ([<InlineIfLambda>]parser2 : ParserMonad<'a>) : ParserMonad<'a> = 
         ParserMonad <| fun input state -> 
             match apply1 parser1 input state with
             | Error _ -> apply1 parser2 input state
@@ -154,11 +168,11 @@ module ParserMonad =
     let inline mfor (items: #seq<'a>) (fn: 'a -> ParserMonad<'b>) : ParserMonad<seq<'b>> = failwithf ""
 
 
-    let (>>=) (m: ParserMonad<'a>) (k: 'a -> ParserMonad<'b>) : ParserMonad<'b> =
+    let inline (>>=) ([<InlineIfLambda>] m: ParserMonad<'a>) (k: 'a -> ParserMonad<'b>) : ParserMonad<'b> =
       bindM m k
    
     type ParserBuilder() = 
-        member inline self.ReturnFrom (ma:ParserMonad<'a>) : ParserMonad<'a> = ma
+        member inline self.ReturnFrom ([<InlineIfLambda>]ma:ParserMonad<'a>) : ParserMonad<'a> = ma
         member inline self.Return x         = mreturn x
         member inline self.Bind (p,f)       = bindM p f
         member inline self.Zero a          = ParserMonad (fun input state -> Ok(a, state))
@@ -182,14 +196,21 @@ module ParserMonad =
 
     let (parseMidi:ParserBuilder) = new ParserBuilder()
 
-    let runParser (ma:ParserMonad<'a>) input initialState =
-      apply1 ma input initialState
-      |> Result.map fst
+    let inline runParser ([<InlineIfLambda>]ma:ParserMonad<'a>) input initialState =
+      #if DEBUG_STOPWATCH
+      initialState.stopwatch.Start()
+      #endif
+      let result = apply1 ma input initialState
+      #if DEBUG_STOPWATCH
+      initialState.stopwatch.Stop()
+      #endif
+      result
+      //|> Result.map fst
 
     /// Run the parser on a file.
     let runParseMidi (ma : ParserMonad<'a>) (inputPath : string) : Result<'a, ParseError> = 
         runParser ma (File.ReadAllBytes inputPath) State.initial
-
+        |> Result.map fst
 
     /// Throw a parse error
     let parseError (genMessage : Pos -> string) : ParserMonad<'a> = 

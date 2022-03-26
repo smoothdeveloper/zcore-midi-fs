@@ -1,0 +1,6 @@
+BenchmarkDotNet
+FsCheck
+FSharp.Core
+Melanchall.DryWetMidi
+NAudio.Midi
+System.IO.Compression

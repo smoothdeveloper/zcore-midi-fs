@@ -1,0 +1,13 @@
+source https://api.nuget.org/v3/index.json
+
+storage: none
+nuget BenchmarkDotnet
+nuget CsvHelper
+nuget Expecto
+nuget FsCheck
+nuget FSharp.Core = 6 redirects:force
+nuget Marten.FSharp
+nuget Melanchall.DryWetMidi
+nuget NAudio.Midi
+nuget System.IO.Compression
+nuget SharpZipLib

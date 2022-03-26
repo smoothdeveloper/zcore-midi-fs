@@ -1,16 +1,15 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net451</TargetFrameworks>
+    <TargetFrameworks>netstandard2.1;</TargetFrameworks>
     <DefineConstants Condition=" '$(TargetFramework)' == 'net451' ">NO_UNIXTIMEMILLISECONDS;$(DefineConstants)</DefineConstants>
+    <DefineConstants>DEBUG_STOPWATCH;$(DefineConstants)</DefineConstants>
     <VersionPrefix>0.0.1</VersionPrefix>
     <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\zmidi-fs-core.XML</DocumentationFile>
   </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|netstandard2.0|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|netstandard2.1|AnyCPU'">
     <Tailcalls>true</Tailcalls>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="DataTypes.fs" />
     <Compile Include="ExtraTypes.fs" />
@@ -19,6 +18,8 @@
     <Compile Include="Internal\WriterMonad.fs" />
     <Compile Include="Read.fs" />
     <Compile Include="Write.fs" />
+    <Compile Include="Isomorphisms.fs" />
+    <Content Include="paket.references" />
   </ItemGroup>
-
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

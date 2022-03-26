@@ -5,16 +5,12 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="ExpectedFailures.fs" />
-    <Compile Include="Infrastructure.fs" />
-    <Compile Include="Tests.fs" />
     <Content Include="paket.references" />
+    <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\ZMidi\zmidi-fs-core.fsproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="NAudio.Midi" Version="2.0.1" />
+    <ProjectReference Include="..\zmidi-fs-core.Tests\zmidi-fs-core.Tests.fsproj" />
   </ItemGroup>
   <PropertyGroup>
     <GenerateProgramFile>false</GenerateProgramFile>

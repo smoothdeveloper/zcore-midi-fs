@@ -15,7 +15,7 @@ type [<Struct>] DeltaTime(value: word32) =
     override x.ToString() = sprintf "DeltaTime:%i" value
 type [<Struct>] word14(value: word16) =
     member x.Value = value
-
+    override x.ToString() = string value
 
 /// The file format - in a MIDI file this is a big-endian 
 /// word16 with 0,1 or 2 being the only valid values. 
@@ -125,7 +125,8 @@ and MidiVoiceEvent =
         | NoteOn(status,_,_)
         | ProgramChange(status,_)
          -> status
-
+    
+        
 and MidiTextType =
     | GenericText
     | CopyrightNotice
@@ -174,7 +175,7 @@ and MidiSysExEvent =
 /// Continuation packet for a (non-standard) multi-part SysEx 
 /// event.
 /// 
-/// Apprently this format is use by Casio.
+/// Apparently this format is use by Casio.
 and MidiSysExContPacket = MidiSysExContPacket of DeltaTime * byte array
 
 
