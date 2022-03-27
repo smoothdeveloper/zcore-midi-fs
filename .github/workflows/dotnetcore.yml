@@ -15,6 +15,6 @@ jobs:
         dotnet-version: '7.x'
         include-prerelease: true
     - name: Build with dotnet
-      run: dotnet build build.proj --configuration Release
+      run: dotnet build ci/build.proj -c Release
     - name: Test with dotnet
-      run: dotnet test build.proj -v n
+      run: dotnet test ci/build.proj -v n

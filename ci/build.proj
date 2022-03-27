@@ -4,6 +4,8 @@
   <Import Project="Directory.Build.props" />
 
   <Target Name="Build">
+    <Exec Command='dotnet tool restore' WorkingDirectory="$(RepoRootDir)" IgnoreStandardErrorWarningFormat="true" />
+    <Exec Command='dotnet paket restore' WorkingDirectory="$(RepoRootDir)" IgnoreStandardErrorWarningFormat="true" />
     <Exec Command='dotnet build src/ZMidi -c Release --version-suffix "$(VersionSuffix)" ' WorkingDirectory="$(RepoRootDir)" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 

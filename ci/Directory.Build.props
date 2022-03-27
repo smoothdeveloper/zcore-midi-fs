@@ -1,7 +1,7 @@
 <Project ToolsVersion="15.0">
 
   <PropertyGroup>
-    <Authors>gusty</Authors>
+    <Authors>Stephen Tetley, Gauthier Segay and others.</Authors>
     <PackageProjectUrl>https://github.com/smoothdeveloper/zmidi-fs-core/</PackageProjectUrl>
     <PackageTags>midi;fsharp</PackageTags>
     <RepositoryType>git</RepositoryType>
@@ -10,8 +10,8 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <RepoRootDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))</RepoRootDir>
-    <NupkgsDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)/bin/nupkg"))</NupkgsDir>
+    <RepoRootDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))/../</RepoRootDir>
+    <NupkgsDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)/bin/nupkg"))/../</NupkgsDir>
     <MonoOrEmpty Condition=" '$(OS)' != 'Windows_NT' ">mono </MonoOrEmpty>
 
     <!-- disable sourcelink on mono, to workaround https://github.com/dotnet/sourcelink/issues/155 -->
