@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29709.97
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32317.152
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "zmidi-fs-core", "src\ZMidi\zmidi-fs-core.fsproj", "{B3A85582-8486-42D2-A05C-A20DBA9A7842}"
 EndProject
@@ -13,7 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "project", "project", "{BF60
 		RELEASE_NOTES.md = RELEASE_NOTES.md
 	EndProjectSection
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "zmidi-fs-core.Benchmarks", "tests\zmidi-fs-core.Benchmarks\zmidi-fs-core.Benchmarks.fsproj", "{24D6A18D-51F0-432B-A50F-30DC6B9C2DFB}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "zmidi-fs-core.Benchmarks", "tests\zmidi-fs-core.Benchmarks\zmidi-fs-core.Benchmarks.fsproj", "{24D6A18D-51F0-432B-A50F-30DC6B9C2DFB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,8 +27,8 @@ Global
 		{B3A85582-8486-42D2-A05C-A20DBA9A7842}.Release|Any CPU.Build.0 = Release|Any CPU
 		{83EB1EBD-A942-4A7D-85CF-831309871506}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{83EB1EBD-A942-4A7D-85CF-831309871506}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{83EB1EBD-A942-4A7D-85CF-831309871506}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{83EB1EBD-A942-4A7D-85CF-831309871506}.Release|Any CPU.Build.0 = Release|Any CPU
+		{83EB1EBD-A942-4A7D-85CF-831309871506}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+		{83EB1EBD-A942-4A7D-85CF-831309871506}.Release|Any CPU.Build.0 = Debug|Any CPU
 		{24D6A18D-51F0-432B-A50F-30DC6B9C2DFB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{24D6A18D-51F0-432B-A50F-30DC6B9C2DFB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{24D6A18D-51F0-432B-A50F-30DC6B9C2DFB}.Release|Any CPU.ActiveCfg = Release|Any CPU

@@ -36,7 +36,11 @@ let downloadFileSet (directory: DirectoryInfo) (filesetUri: string) filesetName 
       
     printfn $"extracting {archive}..."
     match archiveKind with
-    | Zip -> ZipFile.ExtractToDirectory(archive, Path.Combine(directory.FullName, filesetName))
+    | Zip -> 
+      let fz = ICSharpCode.SharpZipLib.Zip.FastZip()
+      fz.ExtractZip(archive, Path.Combine(directory.FullName, filesetName), "")
+      // dotnet one fails one the groove dataset.
+      //ZipFile.ExtractToDirectory(archive, Path.Combine(directory.FullName, filesetName))
     | TarGz -> extractTarGz archive directory.FullName
     File.Delete archive
     printfn $"done with {archive}."

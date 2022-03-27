@@ -11,20 +11,21 @@ open ZMidi
 open ZMidi.ReadFile
 open ZMidi.DataTypes
 
-let downloadMaestroFileSet directory =
-    let filesetName = "maestro-v2.0.0-midi"
-    let filesetUri = @"https://storage.googleapis.com/magentadata/datasets/maestro/v2.0.0/maestro-v2.0.0-midi.zip"
-    downloadFileSet directory filesetUri filesetName Zip
+type Fileset = Fileset of name: string * ArchiveKind * uri: string 
 
-let downloadLmdFileset directory =
-    downloadFileSet directory "http://hog.ee.columbia.edu/craffel/lmd/lmd_full.tar.gz" "lmd_full" TarGz
-        
+let fileSets = [
+  Fileset("maestro-v2.0.0-midi", Zip  , "https://storage.googleapis.com/magentadata/datasets/maestro/v2.0.0/maestro-v2.0.0-midi.zip")
+  Fileset("magentadata-groove" , Zip  , "https://storage.googleapis.com/magentadata/datasets/groove/groove-v1.0.0-midionly.zip")
+  Fileset("magentadata-egmd"   , Zip  , "https://storage.googleapis.com/magentadata/datasets/e-gmd/v1.0.0/e-gmd-v1.0.0-midi.zip")
+  Fileset("lmd_full"           , TarGz, "http://hog.ee.columbia.edu/craffel/lmd/lmd_full.tar.gz")
+]
+      
 let dir = DirectoryInfo(Path.Combine(__SOURCE_DIRECTORY__, "..", "..", "data"))
 let errortext = Path.Combine(dir.FullName, "errortext.txt")
 let enumerateFilesetMidiFiles sort =
     seq {
-      yield! dir.EnumerateFiles("*.midi", SearchOption.AllDirectories) //|> Seq.truncate devCap
-      yield! dir.EnumerateFiles("*.mid", SearchOption.AllDirectories)  //|> Seq.truncate devCap
+      yield! dir.EnumerateFiles("*.midi", SearchOption.AllDirectories)
+      yield! dir.EnumerateFiles("*.mid", SearchOption.AllDirectories) 
     }
     |> Seq.indexed
     |> Seq.sortBy sort
@@ -68,8 +69,10 @@ type MidiFileParseTestOutcome =
 [<Tests>]
 let tests =
   testList "unit" [
-  downloadMaestroFileSet dir
-  downloadLmdFileset dir
+
+  for Fileset(name, kind, uri) in fileSets do
+    downloadFileSet dir uri name kind
+
   let enumFiles () = enumerateFilesetMidiFiles (fun (i,_) ->i)
   let tasks =
     [|
@@ -95,7 +98,7 @@ let tests =
     new DisposableStopwatch(stopwatch)
   
   let performForFile i (f: FileInfo) bytes =
-      let strippedFilename = f.FullName.Replace(dir.FullName,"").Substring(1)
+      let strippedFilename = f.FullName.Replace(dir.FullName,"").Replace("\\","/").Substring(1)
       match runParser midiFile bytes State.initial with
       | Ok(midiFile, parseState) ->
         let readMidiFile = runParser ReadFile.midiFile bytes State.initial
