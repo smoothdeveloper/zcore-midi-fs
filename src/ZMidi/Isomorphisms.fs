@@ -1,4 +1,4 @@
-module Isomorphisms
+module ZMidi.Isomorphisms
 
 open ZMidi
 open ZMidi.Internal
