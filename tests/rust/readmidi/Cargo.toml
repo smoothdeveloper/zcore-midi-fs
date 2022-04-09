@@ -1,0 +1,22 @@
+[package]
+name = "readmidi"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+midi_file = "*"
+walkdir = "2"
+stopwatch = "0.0.7"
+csv = "1.1"
+snafu = "0.6.10"
+midly = "0.5.2" # midi parser
+helgoboss-midi = "0.3.3" # structs
+wmidi = "4.0.6" # structs
+ghakuf = "0.5.6" # event handler concept
+tune = "0.27.0" # tuning maths
+nodi = "0.13.1" # midi player kind of thing
+rimd = "0.0.1" # midi parser
+microwave = "0.24.0"
+midi = "0.1.0"
